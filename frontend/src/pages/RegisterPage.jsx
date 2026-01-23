@@ -1,7 +1,10 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { register } from "../api/authApi";
 import "../App.css";
 
 export default function RegisterPage() {
+    const navigate = useNavigate();
     const [form, setForm] = useState({
         username: "",
         email: "",
@@ -58,7 +61,21 @@ export default function RegisterPage() {
             return;
         }
 
-        setStatus({ type: "ok", text: "All good! Ready to register." });
+        try {
+            await register({
+                username: form.username,
+                email: form.email,
+                password: form.password,
+            });
+            setStatus({ type: "ok", text: "Account created. You can sign in now." });
+            navigate("/login");
+        } catch (error) {
+            const message =
+                error?.response?.data?.message ||
+                error?.response?.data?.error ||
+                "Registration failed. Please try again.";
+            setStatus({ type: "err", text: message });
+        }
     }
 
     function ruleClass(ok) {

@@ -1,7 +1,10 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { login } from "../api/authApi";
 import "../App.css";
 
 export default function LoginPage() {
+    const navigate = useNavigate();
     const [form, setForm] = useState({ email: "", password: "" });
     const [status, setStatus] = useState({ type: "", text: "" });
 
@@ -19,8 +22,24 @@ export default function LoginPage() {
             return;
         }
 
-        // προσωρινό feedback μέχρι να συνδέσουμε backend
-        setStatus({ type: "ok", text: "Looks good! Next we connect it to Spring Boot." });
+        try {
+            const { data } = await login({
+                email: form.email,
+                password: form.password,
+            });
+            localStorage.setItem("authToken", data.token);
+            localStorage.setItem("authUsername", data.username);
+            localStorage.setItem("authEmail", data.email);
+            setStatus({ type: "ok", text: `Welcome back, ${data.username}!` });
+            navigate("/home");
+        } catch (error) {
+            const message =
+                error?.response?.data?.message ||
+                error?.response?.data?.error ||
+                "Login failed. Please check your credentials.";
+            setStatus({ type: "err", text: message });
+        }
+
     }
 
     return (
