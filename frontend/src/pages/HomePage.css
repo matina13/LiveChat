@@ -99,3 +99,10 @@
     color: #64748b;
     font-size: 14px;
 }
+
+.app-shell {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    background: #f6f8fc;
+}
