@@ -23,9 +23,9 @@ export default function Sidebar() {
                     <NavLink className="sidebar-link" to="/home">
                         Home
                     </NavLink>
-                    <button className="sidebar-link sidebar-link--btn" disabled>
+                    <NavLink className="sidebar-link" to="/rooms">
                         Rooms
-                    </button>
+                    </NavLink>
                     <button className="sidebar-link sidebar-link--btn" disabled>
                         Profile
                     </button>

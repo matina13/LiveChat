@@ -60,10 +60,17 @@ export default function HomePage() {
                             )}
 
                             <div className="home-actions">
-                                <button className="btn-primary" type="button">
+                                <button
+                                    className="btn-primary"
+                                    type="button"
+                                    onClick={() => navigate("/rooms")}
+                                >
                                     Start a chat
                                 </button>
-                                <button className="btn-secondary" type="button">
+                                <button className="btn-secondary" type="button"
+
+                                        onClick={() => navigate("/rooms")}
+                                        >
                                     Find a room
                                 </button>
                             </div>
