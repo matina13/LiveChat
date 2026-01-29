@@ -88,6 +88,27 @@
     box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
 }
 
+.home-room-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.home-room-chip {
+    border: 1px solid #d8deea;
+    border-radius: 999px;
+    padding: 6px 12px;
+    background: #ffffff;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.home-room-chip:hover {
+    border-color: #cbd5e1;
+    background: #f8fafc;
+}
+
 .panel-title {
     margin: 0 0 6px;
     font-size: 16px;

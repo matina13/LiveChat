@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
-import { listRooms } from "../api/roomsApi";
+import { getRoom } from "../api/roomsApi";
 import "./RoomViewPage.css";
 
 const seedMessages = [
@@ -31,13 +31,8 @@ export default function RoomViewPage() {
     useEffect(() => {
         async function loadRoom() {
             try {
-                const { data } = await listRooms();
-                const found = data.find((item) => String(item.id) === String(id));
-                if (!found) {
-                    setState({ loading: false, error: "Room not found." });
-                    return;
-                }
-                setRoom(found);
+                const { data } = await getRoom(id);
+                setRoom(data);
                 setState({ loading: false, error: "" });
             } catch (error) {
                 setState({

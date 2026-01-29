@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchMe } from "../api/authApi";
+import { listRooms } from "../api/roomsApi";
 import Sidebar from "../components/Sidebar";
 import "./HomePage.css";
 
@@ -11,16 +12,18 @@ export default function HomePage() {
         user: null,
         error: "",
     });
+    const [rooms, setRooms] = useState([]);
+    const [roomsState, setRoomsState] = useState({ loading: true, error: "" });
 
     useEffect(() => {
         let active = true;
 
-        fetchMe()
-            .then(({ data }) => {
+        async function load() {
+            try {
+                const { data } = await fetchMe();
                 if (!active) return;
                 setState({ status: "ready", user: data, error: "" });
-            })
-            .catch(() => {
+            } catch (error) {
                 if (!active) return;
                 localStorage.removeItem("authToken");
                 localStorage.removeItem("authUsername");
@@ -31,7 +34,27 @@ export default function HomePage() {
                     error: "Session expired. Please sign in again.",
                 });
                 navigate("/login");
-            });
+                return;
+            }
+
+            setRoomsState({ loading: true, error: "" });
+            try {
+                const { data } = await listRooms();
+                if (!active) return;
+                setRooms(data);
+                setRoomsState({ loading: false, error: "" });
+            } catch (error) {
+                if (!active) return;
+                setRoomsState({
+                    loading: false,
+                    error:
+                        error?.response?.data?.message ||
+                        "Unable to load rooms right now.",
+                });
+            }
+        }
+
+        load();
 
         return () => {
             active = false;
@@ -79,7 +102,29 @@ export default function HomePage() {
                         <section className="home-panels">
                             <div className="home-panel">
                                 <h2 className="panel-title">Recent rooms</h2>
-                                <p className="panel-text">No rooms yet. Start your first chat.</p>
+                                {roomsState.loading && (
+                                    <p className="panel-text">Loading rooms...</p>
+                                )}
+                                {roomsState.error && (
+                                    <p className="panel-text">{roomsState.error}</p>
+                                )}
+                                {!roomsState.loading && !roomsState.error && rooms.length === 0 && (
+                                    <p className="panel-text">No rooms yet. Start your first chat.</p>
+                                )}
+                                {!roomsState.loading && !roomsState.error && rooms.length > 0 && (
+                                    <div className="home-room-list">
+                                        {rooms.slice(0, 4).map((room) => (
+                                            <button
+                                                key={room.id}
+                                                className="home-room-chip"
+                                                type="button"
+                                                onClick={() => navigate(`/rooms/${room.id}`)}
+                                            >
+                                                {room.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
 
                             <div className="home-panel">
