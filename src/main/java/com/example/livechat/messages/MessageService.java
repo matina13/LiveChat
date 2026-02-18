@@ -62,6 +62,22 @@ public class MessageService {
         );
     }
 
+    @Transactional
+    public void deleteMessage(long roomId, long messageId, long userId) {
+        Message message = messages.findById(messageId)
+                .orElseThrow(() -> new IllegalArgumentException("Message not found"));
+
+        if (!message.getRoom().getId().equals(roomId)) {
+            throw new IllegalArgumentException("Message not in this room");
+        }
+
+        if (!message.getSender().getId().equals(userId)) {
+            throw new IllegalArgumentException("Cannot delete another user's message");
+        }
+
+        messages.delete(message);
+    }
+
     @Transactional(readOnly = true)
     public MessagesResponse listMessages(long roomId, long userId, int page, int size) {
         if (!rooms.existsById(roomId)) {

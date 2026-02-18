@@ -26,6 +26,17 @@ public class MessageController {
         return ResponseEntity.ok(messages.sendMessage(roomId, userId, request));
     }
 
+    @DeleteMapping("/{messageId}")
+    public ResponseEntity<Void> deleteMessage(
+            @PathVariable long roomId,
+            @PathVariable long messageId,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        long userId = Long.parseLong(jwt.getSubject());
+        messages.deleteMessage(roomId, messageId, userId);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping
     public ResponseEntity<MessagesResponse> listMessages(
             @PathVariable long roomId,

@@ -4,12 +4,14 @@ import java.util.List;
 
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
+import org.springframework.messaging.MessageDeliveryException;
 import org.springframework.messaging.simp.SimpMessageType;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -30,7 +32,12 @@ public class WebSocketJwtAuthInterceptor implements ChannelInterceptor {
                 throw new IllegalArgumentException("Missing Authorization token");
             }
 
-            Jwt jwt = jwtDecoder.decode(token);
+            Jwt jwt;
+            try {
+                jwt = jwtDecoder.decode(token);
+            } catch (JwtException e) {
+                throw new MessageDeliveryException(message, "Token validation failed: " + e.getMessage(), e);
+            }
             UsernamePasswordAuthenticationToken auth =
                     new UsernamePasswordAuthenticationToken(jwt.getSubject(), null, List.of());
             accessor.setUser(auth);

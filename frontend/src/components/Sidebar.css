@@ -1,81 +1,111 @@
-.sidebar {
-    position: sticky;
-    top: 0;
+.icon-rail {
+    width: 64px;
+    flex-shrink: 0;
     height: 100vh;
-    padding: 18px;
-    border-right: 1px solid #e6eaf2;
-    background: #ffffff;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0 16px;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    gap: 6px;
+    z-index: 10;
 }
 
-.sidebar-brand {
+.rail-logo {
+    width: 40px;
+    height: 40px;
+    border-radius: 14px;
+    background: var(--accent);
+    color: #fff;
     font-weight: 800;
-    font-size: 18px;
-    color: #0f172a;
-    cursor: pointer;
-    margin-bottom: 18px;
-}
-
-.sidebar-nav {
-    display: grid;
-    gap: 10px;
-}
-
-.sidebar-link {
-    display: block;
-    text-decoration: none;
-    padding: 10px 12px;
-    border-radius: 12px;
-    font-weight: 700;
-    color: #0f172a;
-    border: 1px solid transparent;
-    cursor: pointer;
-    background: transparent;
-    text-align: left;
-}
-
-.sidebar-link:hover {
-    background: #f6f8fc;
-    border-color: #e6eaf2;
-}
-
-.sidebar-link.active {
-    background: #eef2ff;
-    border-color: #c7d2fe;
-}
-
-.sidebar-link--btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.sidebar-bottom {
-    display: grid;
-    gap: 12px;
-}
-
-.sidebar-user-name {
-    font-weight: 800;
-    color: #0f172a;
-}
-
-.sidebar-user-sub {
     font-size: 13px;
-    color: #64748b;
-}
-
-.sidebar-logout {
-    width: 100%;
-    padding: 12px 14px;
-    border-radius: 12px;
-    border: 1px solid #e6eaf2;
-    background: #ffffff;
-    font-weight: 800;
+    letter-spacing: -0.5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
+    border: none;
+    margin-bottom: 10px;
+    flex-shrink: 0;
+    transition: opacity 0.15s;
 }
 
-.sidebar-logout:hover {
-    background: #f6f8fc;
+.rail-logo:hover {
+    opacity: 0.88;
+}
+
+.rail-spacer {
+    flex: 1;
+}
+
+.rail-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    border: none;
+    background: transparent;
+    color: var(--ink-2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    flex-shrink: 0;
+    position: relative;
+}
+
+.rail-btn:hover {
+    background: var(--hover-bg);
+    color: var(--ink);
+}
+
+.rail-btn--active {
+    background: var(--active-bg);
+    color: var(--accent);
+}
+
+.rail-btn--user {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    padding: 0;
+    overflow: hidden;
+}
+
+.rail-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-weight: 700;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.15s;
+    pointer-events: none;
+}
+
+.rail-logout-hint {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(239, 68, 68, 0.9);
+    border-radius: 50%;
+    opacity: 0;
+    color: #fff;
+    transition: opacity 0.15s;
+    pointer-events: none;
+}
+
+.rail-btn--user:hover .rail-logout-hint {
+    opacity: 1;
+}
+
+.rail-btn--user:hover .rail-avatar {
+    opacity: 0;
 }

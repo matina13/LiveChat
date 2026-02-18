@@ -29,6 +29,9 @@ public class Room {
     @Column(name = "last_message_at")
     private OffsetDateTime lastMessageAt;
 
+    @Column(name = "type", nullable = false, length = 10)
+    private String type = "group";
+
     @PrePersist
     void prePersist() {
         if (createdAt == null) createdAt = OffsetDateTime.now();
@@ -44,4 +47,6 @@ public class Room {
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public OffsetDateTime getLastMessageAt() { return lastMessageAt; }
     public void setLastMessageAt(OffsetDateTime lastMessageAt) { this.lastMessageAt = lastMessageAt; }
+    public String getType() { return type; }
+    public void setType(String type) { this.type = type; }
 }

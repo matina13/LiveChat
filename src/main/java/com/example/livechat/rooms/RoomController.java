@@ -51,6 +51,44 @@ public class RoomController {
         return ResponseEntity.ok(rooms.joinRoom(id, userId));
     }
 
+    @DeleteMapping("/{id}/leave")
+    public ResponseEntity<Void> leaveRoom(
+            @PathVariable long id,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        long userId = Long.parseLong(jwt.getSubject());
+        rooms.leaveRoom(id, userId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteRoom(
+            @PathVariable long id,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        long userId = Long.parseLong(jwt.getSubject());
+        rooms.deleteRoom(id, userId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}/members")
+    public ResponseEntity<List<MemberResponse>> getMembers(
+            @PathVariable long id,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        long userId = Long.parseLong(jwt.getSubject());
+        return ResponseEntity.ok(rooms.getMembers(id, userId));
+    }
+
+    @PostMapping("/dm/{targetUserId}")
+    public ResponseEntity<RoomResponse> startDm(
+            @PathVariable long targetUserId,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        long userId = Long.parseLong(jwt.getSubject());
+        return ResponseEntity.ok(rooms.findOrCreateDm(targetUserId, userId));
+    }
+
     @GetMapping("/public")
     public ResponseEntity<PublicRoomsResponse> searchPublicRooms(
             @RequestParam(required = false, defaultValue = "") String query,

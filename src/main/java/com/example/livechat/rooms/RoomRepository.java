@@ -17,7 +17,7 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
             from RoomMember rm
             join rm.room r
             where rm.user.id = :userId
-            order by r.createdAt desc
+            order by r.lastMessageAt desc nulls last, r.createdAt desc
             """)
     List<Room> findAllForMember(@Param("userId") long userId);
 
@@ -30,9 +30,18 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
     Optional<Room> findByIdForMember(@Param("roomId") long roomId, @Param("userId") long userId);
 
     @Query("""
+            select r from Room r
+            join RoomMember rm1 on rm1.room = r and rm1.user.id = :userId1
+            join RoomMember rm2 on rm2.room = r and rm2.user.id = :userId2
+            where r.type = 'direct'
+            """)
+    Optional<Room> findDmBetween(@Param("userId1") long userId1, @Param("userId2") long userId2);
+
+    @Query("""
             select r
             from Room r
             where r.isPrivate = false
+              and r.type = 'group'
               and lower(r.name) like lower(concat('%', :query, '%'))
               and not exists (
                 select 1 from RoomMember rm

@@ -7,5 +7,7 @@ public record RoomResponse(
         String name,
         boolean isPrivate,
         Long creatorId,
-        OffsetDateTime createdAt
+        OffsetDateTime createdAt,
+        String type,
+        String otherUsername
 ) {}
