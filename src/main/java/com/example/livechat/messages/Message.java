@@ -22,11 +22,17 @@ public class Message {
     @JoinColumn(name = "sender_id", nullable = false)
     private User sender;
 
-    @Column(nullable = false)
+    @Column
     private String content;
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
+
+    @Column(name = "deleted_at")
+    private OffsetDateTime deletedAt;
+
+    @Column(name = "edited_at")
+    private OffsetDateTime editedAt;
 
     @PrePersist
     void prePersist() {
@@ -41,4 +47,8 @@ public class Message {
     public String getContent() { return content; }
     public void setContent(String content) { this.content = content; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
+    public OffsetDateTime getDeletedAt() { return deletedAt; }
+    public void setDeletedAt(OffsetDateTime deletedAt) { this.deletedAt = deletedAt; }
+    public OffsetDateTime getEditedAt() { return editedAt; }
+    public void setEditedAt(OffsetDateTime editedAt) { this.editedAt = editedAt; }
 }

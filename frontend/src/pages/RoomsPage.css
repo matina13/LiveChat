@@ -782,6 +782,63 @@
     color: #ef4444;
 }
 
+/* ─── Presence dots ─────────────────────────────────────────── */
+.presence-dot {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    border: 2px solid var(--surface-1);
+}
+
+.presence-dot--on  { background: #22c55e; }
+.presence-dot--off { background: var(--ink-3, #aaa); }
+
+.info-member-avatar-wrap {
+    position: relative;
+    flex-shrink: 0;
+}
+
+/* ─── Deleted / edited messages ─────────────────────────────── */
+.msg-bubble--deleted p {
+    color: var(--ink-2);
+    font-style: italic;
+}
+
+.msg-edited {
+    display: block;
+    font-size: 10px;
+    color: var(--ink-2);
+    margin-top: 2px;
+}
+
+/* ─── Inline edit ────────────────────────────────────────────── */
+.msg-edit-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 200px;
+}
+
+.msg-edit-input {
+    background: var(--surface-2);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    color: var(--ink-1);
+    font-size: 14px;
+    padding: 6px 10px;
+    outline: none;
+    width: 100%;
+}
+
+.msg-edit-hint {
+    font-size: 10px;
+    color: var(--ink-2);
+    padding: 0 2px;
+}
+
 /* ─── Typing indicator ───────────────────────────────────────── */
 .typing-indicator {
     display: flex;

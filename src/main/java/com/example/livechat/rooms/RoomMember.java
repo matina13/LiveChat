@@ -27,6 +27,9 @@ public class RoomMember {
     @Column(name = "joined_at", nullable = false)
     private OffsetDateTime joinedAt;
 
+    @Column(name = "last_read_at")
+    private OffsetDateTime lastReadAt;
+
     @PrePersist
     void prePersist() {
         if (joinedAt == null) joinedAt = OffsetDateTime.now();
@@ -40,4 +43,6 @@ public class RoomMember {
     public String getRole() { return role; }
     public void setRole(String role) { this.role = role; }
     public OffsetDateTime getJoinedAt() { return joinedAt; }
+    public OffsetDateTime getLastReadAt() { return lastReadAt; }
+    public void setLastReadAt(OffsetDateTime lastReadAt) { this.lastReadAt = lastReadAt; }
 }

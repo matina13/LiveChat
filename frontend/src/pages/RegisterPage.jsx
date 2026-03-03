@@ -1,10 +1,12 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Navigate } from "react-router-dom";
 import { register } from "../api/authApi";
 import "../App.css";
 
 export default function RegisterPage() {
     const navigate = useNavigate();
+
+    if (localStorage.getItem("authToken")) return <Navigate to="/home" replace />;
     const [form, setForm] = useState({
         username: "",
         email: "",

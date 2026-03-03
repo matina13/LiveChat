@@ -1,5 +1,6 @@
 package com.example.livechat.rooms;
 
+import com.example.livechat.websocket.PresenceService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -13,9 +14,13 @@ import java.util.List;
 public class RoomController {
 
     private final RoomService rooms;
+    private final RoomMemberRepository members;
+    private final PresenceService presence;
 
-    public RoomController(RoomService rooms) {
+    public RoomController(RoomService rooms, RoomMemberRepository members, PresenceService presence) {
         this.rooms = rooms;
+        this.members = members;
+        this.presence = presence;
     }
 
     @PostMapping
@@ -87,6 +92,33 @@ public class RoomController {
     ) {
         long userId = Long.parseLong(jwt.getSubject());
         return ResponseEntity.ok(rooms.findOrCreateDm(targetUserId, userId));
+    }
+
+    @GetMapping("/presence")
+    public ResponseEntity<List<Long>> getMyPresence(@AuthenticationPrincipal Jwt jwt) {
+        long userId = Long.parseLong(jwt.getSubject());
+        List<Long> myRoomIds = members.findRoomIdsByUserId(userId);
+        if (myRoomIds.isEmpty()) return ResponseEntity.ok(List.of());
+        List<Long> onlineIds = members.findUserIdsByRoomIds(myRoomIds).stream()
+                .filter(presence::isOnline)
+                .toList();
+        return ResponseEntity.ok(onlineIds);
+    }
+
+    @GetMapping("/{id}/presence")
+    public ResponseEntity<List<Long>> getRoomPresence(
+            @PathVariable long id,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        long userId = Long.parseLong(jwt.getSubject());
+        if (!members.existsByRoom_IdAndUser_Id(id, userId)) {
+            throw new IllegalArgumentException("Not a member of this room");
+        }
+        List<Long> onlineIds = members.findAllByRoomId(id).stream()
+                .map(m -> m.getUser().getId())
+                .filter(presence::isOnline)
+                .toList();
+        return ResponseEntity.ok(onlineIds);
     }
 
     @GetMapping("/public")

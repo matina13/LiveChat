@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import Sidebar from "../components/Sidebar";
-import { createRoom, joinRoom, listRooms, searchPublicRooms, getRoom, leaveRoom, deleteRoom, getRoomMembers, startDm } from "../api/roomsApi";
-import { listMessages, sendMessage, deleteMessage } from "../api/messagesApi";
+import { createRoom, joinRoom, listRooms, searchPublicRooms, getRoom, leaveRoom, deleteRoom, getRoomMembers, startDm, getPresence } from "../api/roomsApi";
+import { listMessages, sendMessage, editMessage, deleteMessage, markRoomRead } from "../api/messagesApi";
 import { searchUsers } from "../api/usersApi";
 import { createStompClient } from "../api/wsClient";
 import "./RoomsPage.css";
@@ -85,17 +85,23 @@ export default function RoomsPage() {
     const [messages, setMessages] = useState([]);
     const [messageState, setMessageState] = useState({ loading: false, error: "" });
     const [draft, setDraft] = useState("");
+    const [editingMessageId, setEditingMessageId] = useState(null);
+    const [editContent, setEditContent] = useState("");
 
     // Typing
     const [typers, setTypers] = useState({});
     const typerTimersRef = useRef({});
     const lastTypeSentRef = useRef(0);
 
+    // Presence  { userId: boolean }
+    const [onlineUsers, setOnlineUsers] = useState({});
+
     // WS
     const [wsConnected, setWsConnected] = useState(false);
     const clientRef = useRef(null);
     const subscriptionRef = useRef(null);
     const typingSubRef = useRef(null);
+    const presenceSubsRef = useRef({});   // roomId → subscription
     const notifSubRef = useRef(null);
     const resubscribeRef = useRef(null);
     const activeRoomIdRef = useRef(null);
@@ -129,8 +135,14 @@ export default function RoomsPage() {
     async function loadRooms() {
         try {
             setRoomsState({ loading: true, error: "" });
-            const { data } = await listRooms();
+            const [{ data }, { data: onlineIds }] = await Promise.all([listRooms(), getPresence()]);
             setRooms(data);
+            const counts = {};
+            data.forEach((r) => { if (r.unreadCount > 0) counts[r.id] = r.unreadCount; });
+            setUnreadCounts(counts);
+            const onlineMap = {};
+            onlineIds.forEach((id) => { onlineMap[String(id)] = true; });
+            setOnlineUsers(onlineMap);
             setRoomsState({ loading: false, error: "" });
             if (!activeRoomId && data.length > 0) setActiveRoomId(data[0].id);
         } catch (err) {
@@ -242,7 +254,19 @@ export default function RoomsPage() {
                 `/topic/rooms/${roomId}`,
                 (msg) => {
                     const payload = JSON.parse(msg.body);
-                    setMessages((prev) => [...prev, mapMessage(payload, userId, username)]);
+                    if (payload.type === "edit") {
+                        setMessages((prev) => prev.map((m) =>
+                            m.id === payload.id
+                                ? { ...m, content: payload.content, editedAt: payload.editedAt }
+                                : m
+                        ));
+                    } else if (payload.type === "delete") {
+                        setMessages((prev) => prev.map((m) =>
+                            m.id === payload.id ? { ...m, deleted: true, content: null } : m
+                        ));
+                    } else {
+                        setMessages((prev) => [...prev, mapMessage(payload, userId, username)]);
+                    }
                 }
             );
             typingSubRef.current = client.subscribe(
@@ -252,6 +276,7 @@ export default function RoomsPage() {
         }
 
         client.onConnect = () => {
+            client._resetReconnect();
             setWsConnected(true);
 
             // Personal notification channel — receives events for ALL rooms, not just the active one
@@ -269,9 +294,13 @@ export default function RoomsPage() {
 
             resubscribe(activeRoomIdRef.current);
         };
-        client.onDisconnect = () => setWsConnected(false);
+        client.onDisconnect = () => {
+            setWsConnected(false);
+            client._scheduleReconnect();
+        };
         client.onStompError = () => {
             setWsConnected(false);
+            client._scheduleReconnect();
             showToast("err", "Real-time connection lost. Messages may be delayed.");
         };
 
@@ -283,6 +312,8 @@ export default function RoomsPage() {
             subscriptionRef.current?.unsubscribe();
             typingSubRef.current?.unsubscribe();
             notifSubRef.current?.unsubscribe();
+            Object.values(presenceSubsRef.current).forEach((s) => s.unsubscribe());
+            presenceSubsRef.current = {};
             subscriptionRef.current = null;
             typingSubRef.current = null;
             notifSubRef.current = null;
@@ -292,11 +323,51 @@ export default function RoomsPage() {
         };
     }, [token, userId, username]);
 
+    // ── Subscribe to presence for ALL rooms ──────────────────
+    useEffect(() => {
+        const client = clientRef.current;
+        if (!client?.connected || rooms.length === 0) return;
+
+        const currentIds = new Set(rooms.map((r) => String(r.id)));
+
+        // Unsubscribe rooms no longer in list
+        Object.keys(presenceSubsRef.current).forEach((id) => {
+            if (!currentIds.has(id)) {
+                presenceSubsRef.current[id].unsubscribe();
+                delete presenceSubsRef.current[id];
+            }
+        });
+
+        // Subscribe to new rooms
+        rooms.forEach((room) => {
+            const key = String(room.id);
+            if (!presenceSubsRef.current[key]) {
+                presenceSubsRef.current[key] = client.subscribe(
+                    `/topic/rooms/${room.id}/presence`,
+                    (msg) => {
+                        const { userId, online } = JSON.parse(msg.body);
+                        setOnlineUsers((prev) => ({ ...prev, [String(userId)]: online }));
+                    }
+                );
+            }
+        });
+
+        // Refresh presence state now that subscriptions are active.
+        // The backend broadcasts on connect but React hasn't subscribed yet at that
+        // moment, so we re-fetch via HTTP to get the current snapshot.
+        getPresence().then(({ data: onlineIds }) => {
+            const map = {};
+            onlineIds.forEach((id) => { map[String(id)] = true; });
+            setOnlineUsers(map);
+        }).catch(() => {});
+    }, [rooms, wsConnected]);
+
     // ── Swap subscription on room change ────────────────────
     useEffect(() => {
         activeRoomIdRef.current = activeRoomId;
         resubscribeRef.current?.(activeRoomId);
-        // Clear unread count for the room we just opened
+        setEditingMessageId(null);
+        setEditContent("");
         if (activeRoomId) {
             setUnreadCounts((prev) => {
                 if (!prev[activeRoomId]) return prev;
@@ -304,6 +375,7 @@ export default function RoomsPage() {
                 delete next[activeRoomId];
                 return next;
             });
+            markRoomRead(activeRoomId).catch(() => {});
         }
     }, [activeRoomId]);
 
@@ -361,9 +433,25 @@ export default function RoomsPage() {
     async function handleDeleteMessage(messageId) {
         try {
             await deleteMessage(activeRoomId, messageId);
-            setMessages((prev) => prev.filter((m) => m.id !== messageId));
+            setMessages((prev) => prev.map((m) =>
+                m.id === messageId ? { ...m, deleted: true, content: null } : m
+            ));
         } catch (err) {
             showToast("err", err?.response?.data?.message || "Failed to delete message.");
+        }
+    }
+
+    async function handleEditMessage(messageId, newContent) {
+        if (!newContent.trim()) return;
+        try {
+            await editMessage(activeRoomId, messageId, { content: newContent.trim() });
+            setMessages((prev) => prev.map((m) =>
+                m.id === messageId ? { ...m, content: newContent.trim(), editedAt: new Date().toISOString() } : m
+            ));
+            setEditingMessageId(null);
+            setEditContent("");
+        } catch (err) {
+            showToast("err", err?.response?.data?.message || "Failed to edit message.");
         }
     }
 
@@ -525,11 +613,15 @@ export default function RoomsPage() {
                                     <div className="list-section-label">Direct Messages</div>
                                     {dmRooms.map((room) => {
                                         const hasUnread = unreadCounts[room.id] > 0;
+                                        const otherOnline = room.otherUserId && onlineUsers[String(room.otherUserId)];
                                         return (
                                             <button key={room.id} className={`room-item ${room.id === activeRoomId ? "room-item--active" : ""}`} onClick={() => setActiveRoomId(room.id)}>
                                                 <div className="room-item-avatar-wrap">
                                                     <div className="room-item-avatar room-item-avatar--dm">{getRoomInitial(room)}</div>
-                                                    {hasUnread && <span className="unread-dot" />}
+                                                    {hasUnread
+                                                        ? <span className="unread-dot" />
+                                                        : <span className={`presence-dot ${otherOnline ? "presence-dot--on" : "presence-dot--off"}`} />
+                                                    }
                                                 </div>
                                                 <div className="room-item-info">
                                                     <span className={`room-item-name ${hasUnread ? "room-item-name--unread" : ""}`}>{getRoomDisplayName(room)}</span>
@@ -621,10 +713,37 @@ export default function RoomsPage() {
                                     {!msg.isMe && <div className="msg-avatar">{msg.author.charAt(0).toUpperCase()}</div>}
                                     <div className="msg-content">
                                         {!msg.isMe && <div className="msg-author">{msg.author}</div>}
-                                        <div className="msg-bubble"><p>{msg.content}</p></div>
+                                        {editingMessageId === msg.id ? (
+                                            <div className="msg-edit-wrap">
+                                                <input
+                                                    className="msg-edit-input"
+                                                    value={editContent}
+                                                    onChange={(e) => setEditContent(e.target.value)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === "Enter") handleEditMessage(msg.id, editContent);
+                                                        if (e.key === "Escape") { setEditingMessageId(null); setEditContent(""); }
+                                                    }}
+                                                    autoFocus
+                                                />
+                                                <span className="msg-edit-hint">Enter to save · Esc to cancel</span>
+                                            </div>
+                                        ) : (
+                                            <div
+                                                className={`msg-bubble ${msg.deleted ? "msg-bubble--deleted" : ""}`}
+                                                onDoubleClick={() => {
+                                                    if (msg.isMe && !msg.deleted) {
+                                                        setEditingMessageId(msg.id);
+                                                        setEditContent(msg.content);
+                                                    }
+                                                }}
+                                            >
+                                                <p>{msg.deleted ? "This message was deleted" : msg.content}</p>
+                                                {msg.editedAt && !msg.deleted && <span className="msg-edited">(edited)</span>}
+                                            </div>
+                                        )}
                                         <div className="msg-time-row">
                                             <span className="msg-time">{msg.time}</span>
-                                            {msg.isMe && (
+                                            {msg.isMe && !msg.deleted && editingMessageId !== msg.id && (
                                                 <button className="msg-delete" onClick={() => handleDeleteMessage(msg.id)} title="Delete message">
                                                     <IconTrash />
                                                 </button>
@@ -684,7 +803,10 @@ export default function RoomsPage() {
                                     <h4 className="info-section-title">Members · {roomMembers.length}</h4>
                                     {roomMembers.map((m) => (
                                         <div key={m.userId} className="info-member">
-                                            <div className="info-member-avatar">{m.username.charAt(0).toUpperCase()}</div>
+                                            <div className="info-member-avatar-wrap">
+                                                <div className="info-member-avatar">{m.username.charAt(0).toUpperCase()}</div>
+                                                <span className={`presence-dot ${onlineUsers[String(m.userId)] ? "presence-dot--on" : "presence-dot--off"}`} />
+                                            </div>
                                             <span className="info-member-name">{m.username}{String(m.userId) === String(userId) ? " (you)" : ""}</span>
                                             {m.role !== "member" && <span className="info-role-badge">{m.role}</span>}
                                         </div>
@@ -731,7 +853,7 @@ function parseJwt(token) {
     try {
         const payload = token.split(".")[1];
         const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
-        return JSON.parse(decodeURIComponent(escape(json)));
+        return JSON.parse(new TextDecoder().decode(Uint8Array.from(json, c => c.charCodeAt(0))));
     } catch { return null; }
 }
 
@@ -739,5 +861,13 @@ function mapMessage(message, userId, username) {
     const isMe = userId && String(message.senderId) === String(userId);
     const author = isMe ? username : message.senderUsername || `User ${message.senderId}`;
     const timestamp = new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    return { id: message.id, author, content: message.content, time: timestamp, isMe };
+    return {
+        id: message.id,
+        author,
+        content: message.content,
+        time: timestamp,
+        isMe,
+        deleted: message.deleted || false,
+        editedAt: message.editedAt || null,
+    };
 }

@@ -7,6 +7,9 @@ public record MessageResponse(
         Long roomId,
         Long senderId,
         String senderUsername,
-        String content,
-        OffsetDateTime createdAt
+        String content,        // null when deleted
+        OffsetDateTime createdAt,
+        OffsetDateTime editedAt,
+        boolean deleted,
+        String type            // "message" | "edit" | "delete"  — used by WS clients
 ) {}

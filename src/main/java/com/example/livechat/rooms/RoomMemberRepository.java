@@ -1,9 +1,11 @@
 package com.example.livechat.rooms;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -20,4 +22,14 @@ public interface RoomMemberRepository extends JpaRepository<RoomMember, Long> {
 
     @Query("select rm.user.id from RoomMember rm where rm.room.id = :roomId and rm.user.id <> :senderId")
     List<Long> findRecipientIds(@Param("roomId") long roomId, @Param("senderId") long senderId);
+
+    @Modifying
+    @Query("update RoomMember rm set rm.lastReadAt = :time where rm.room.id = :roomId and rm.user.id = :userId")
+    void updateLastReadAt(@Param("roomId") long roomId, @Param("userId") long userId, @Param("time") OffsetDateTime time);
+
+    @Query("select rm.room.id from RoomMember rm where rm.user.id = :userId")
+    List<Long> findRoomIdsByUserId(@Param("userId") long userId);
+
+    @Query("select distinct rm.user.id from RoomMember rm where rm.room.id in :roomIds")
+    List<Long> findUserIdsByRoomIds(@Param("roomIds") List<Long> roomIds);
 }

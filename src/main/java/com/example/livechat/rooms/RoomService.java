@@ -1,13 +1,17 @@
 package com.example.livechat.rooms;
 
+import com.example.livechat.messages.MessageRepository;
 import com.example.livechat.users.User;
 import com.example.livechat.users.UserRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class RoomService {
@@ -15,11 +19,13 @@ public class RoomService {
     private final RoomRepository rooms;
     private final RoomMemberRepository members;
     private final UserRepository users;
+    private final MessageRepository messages;
 
-    public RoomService(RoomRepository rooms, RoomMemberRepository members, UserRepository users) {
+    public RoomService(RoomRepository rooms, RoomMemberRepository members, UserRepository users, MessageRepository messages) {
         this.rooms = rooms;
         this.members = members;
         this.users = users;
+        this.messages = messages;
     }
 
     @Transactional
@@ -87,7 +93,16 @@ public class RoomService {
 
     @Transactional(readOnly = true)
     public List<RoomResponse> listRooms(long userId) {
-        return rooms.findAllForMember(userId).stream().map(r -> toResponse(r, userId)).toList();
+        List<Room> roomList = rooms.findAllForMember(userId);
+        if (roomList.isEmpty()) return List.of();
+
+        List<Long> roomIds = roomList.stream().map(Room::getId).toList();
+        Map<Long, Long> unread = messages.countUnreadPerRoom(userId, roomIds).stream()
+                .collect(Collectors.toMap(r -> (Long) r[0], r -> (Long) r[1]));
+
+        return roomList.stream()
+                .map(r -> toResponse(r, userId, unread.getOrDefault(r.getId(), 0L)))
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -110,14 +125,16 @@ public class RoomService {
             throw new IllegalArgumentException("Room is private");
         }
 
-        if (!members.existsByRoom_IdAndUser_Id(roomId, userId)) {
-            User user = users.findById(userId)
-                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
-            RoomMember member = new RoomMember();
-            member.setRoom(room);
-            member.setUser(user);
-            member.setRole("member");
+        User user = users.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        RoomMember member = new RoomMember();
+        member.setRoom(room);
+        member.setUser(user);
+        member.setRole("member");
+        try {
             members.save(member);
+        } catch (DataIntegrityViolationException ignored) {
+            // already a member — idempotent
         }
 
         return toResponse(room, userId);
@@ -183,11 +200,20 @@ public class RoomService {
     }
 
     private RoomResponse toResponse(Room room, long userId) {
+        return toResponse(room, userId, 0L);
+    }
+
+    private RoomResponse toResponse(Room room, long userId, long unreadCount) {
         String otherUsername = null;
+        Long otherUserId = null;
         if ("direct".equals(room.getType()) && userId > 0) {
-            otherUsername = members.findOtherMember(room.getId(), userId)
-                    .map(rm -> rm.getUser().getUsername())
-                    .orElse("Unknown");
+            var other = members.findOtherMember(room.getId(), userId).orElse(null);
+            if (other != null) {
+                otherUsername = other.getUser().getUsername();
+                otherUserId = other.getUser().getId();
+            } else {
+                otherUsername = "Unknown";
+            }
         }
         return new RoomResponse(
                 room.getId(),
@@ -196,7 +222,9 @@ public class RoomService {
                 room.getCreator().getId(),
                 room.getCreatedAt(),
                 room.getType(),
-                otherUsername
+                otherUsername,
+                otherUserId,
+                unreadCount
         );
     }
 }

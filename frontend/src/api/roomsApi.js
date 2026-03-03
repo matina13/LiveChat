@@ -9,3 +9,5 @@ export function leaveRoom(id)             { return api.delete(`/api/rooms/${id}/
 export function deleteRoom(id)            { return api.delete(`/api/rooms/${id}`); }
 export function getRoomMembers(id)        { return api.get(`/api/rooms/${id}/members`); }
 export function startDm(targetUserId)     { return api.post(`/api/rooms/dm/${targetUserId}`); }
+export function getRoomPresence(id)       { return api.get(`/api/rooms/${id}/presence`); }
+export function getPresence()             { return api.get(`/api/rooms/presence`); }

@@ -8,6 +8,7 @@ import org.springframework.messaging.MessageDeliveryException;
 import org.springframework.messaging.simp.SimpMessageType;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
+import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -46,6 +47,9 @@ public class WebSocketJwtAuthInterceptor implements ChannelInterceptor {
                 accessor.getSessionAttributes().put("userId", jwt.getSubject());
                 accessor.getSessionAttributes().put("username", jwt.getClaimAsString("username"));
             }
+            // Return new message so the user principal is in the headers Spring reads for
+            // SessionConnectedEvent (wrap() copies headers; the original has no user set).
+            return MessageBuilder.createMessage(message.getPayload(), accessor.toMessageHeaders());
         } else if (accessor.getUser() == null && accessor.getSessionAttributes() != null) {
             Object user = accessor.getSessionAttributes().get("user");
             if (user instanceof UsernamePasswordAuthenticationToken auth) {

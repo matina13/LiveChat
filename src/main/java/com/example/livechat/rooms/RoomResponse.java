@@ -9,5 +9,7 @@ public record RoomResponse(
         Long creatorId,
         OffsetDateTime createdAt,
         String type,
-        String otherUsername
+        String otherUsername,
+        Long otherUserId,       // non-null for direct rooms
+        long unreadCount
 ) {}

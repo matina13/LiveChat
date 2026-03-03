@@ -68,9 +68,8 @@ public class MessageWebSocketController {
         messagingTemplate.convertAndSend("/topic/rooms/" + roomId, response);
 
         // Notify all other members so they can update unread counts even if the room isn't open
-        String preview = response.content().length() > 60
-                ? response.content().substring(0, 60) + "…"
-                : response.content();
+        String raw = response.content() != null ? response.content() : "";
+        String preview = raw.length() > 60 ? raw.substring(0, 60) + "…" : raw;
 
         Map<String, Object> notification = Map.of(
                 "roomId", roomId,
