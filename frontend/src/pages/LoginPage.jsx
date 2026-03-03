@@ -5,10 +5,10 @@ import "../App.css";
 
 export default function LoginPage() {
     const navigate = useNavigate();
-
-    if (localStorage.getItem("authToken")) return <Navigate to="/home" replace />;
     const [form, setForm] = useState({ email: "", password: "" });
     const [status, setStatus] = useState({ type: "", text: "" });
+
+    if (localStorage.getItem("authToken")) return <Navigate to="/home" replace />;
 
     function handleChange(e) {
         const { name, value } = e.target;

@@ -5,8 +5,6 @@ import "../App.css";
 
 export default function RegisterPage() {
     const navigate = useNavigate();
-
-    if (localStorage.getItem("authToken")) return <Navigate to="/home" replace />;
     const [form, setForm] = useState({
         username: "",
         email: "",
@@ -38,6 +36,8 @@ export default function RegisterPage() {
 
     const allPasswordOk = rules.minLen && rules.hasCapital && rules.hasSpecial;
     const allOk = allPasswordOk && rules.confirmOk;
+
+    if (localStorage.getItem("authToken")) return <Navigate to="/home" replace />;
 
     function handleChange(e) {
         const { name, value } = e.target;

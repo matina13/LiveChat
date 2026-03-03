@@ -12,8 +12,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Service
 public class PresenceService {
 
-    private static final Logger log = LoggerFactory.getLogger(PresenceService.class);
-
     private final ConcurrentHashMap<Long, AtomicInteger> connections = new ConcurrentHashMap<>();
 
     private final RoomMemberRepository members;

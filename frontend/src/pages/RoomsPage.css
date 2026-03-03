@@ -790,11 +790,11 @@
     width: 9px;
     height: 9px;
     border-radius: 50%;
-    border: 2px solid var(--surface-1);
+    border: 2px solid var(--panel);
 }
 
 .presence-dot--on  { background: #22c55e; }
-.presence-dot--off { background: var(--ink-3, #aaa); }
+.presence-dot--off { background: var(--ink-2); }
 
 .info-member-avatar-wrap {
     position: relative;
@@ -823,10 +823,10 @@
 }
 
 .msg-edit-input {
-    background: var(--surface-2);
+    background: var(--input-bg);
     border: 1px solid var(--accent);
     border-radius: 8px;
-    color: var(--ink-1);
+    color: var(--ink);
     font-size: 14px;
     padding: 6px 10px;
     outline: none;

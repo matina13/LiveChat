@@ -19,7 +19,7 @@ public class GlobalExceptionHandler {
         var errors = ex.getBindingResult().getFieldErrors().stream()
                 .collect(Collectors.toMap(
                         e -> e.getField(),
-                        e -> e.getDefaultMessage(),
+                        e -> e.getDefaultMessage() != null ? e.getDefaultMessage() : "Invalid value",
                         (a, b) -> a
                 ));
         return ResponseEntity.badRequest().body(Map.of("errors", errors));
