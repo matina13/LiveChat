@@ -11,5 +11,6 @@ public record MessageResponse(
         OffsetDateTime createdAt,
         OffsetDateTime editedAt,
         boolean deleted,
-        String type            // "message" | "edit" | "delete"  — used by WS clients
+        String type,           // "message" | "edit" | "delete"  — used by WS clients
+        String messageType     // "text" | "image"
 ) {}

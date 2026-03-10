@@ -1,13 +1,20 @@
 package com.example.livechat.messages;
 
 import jakarta.validation.Valid;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/rooms/{roomId}/messages")
@@ -76,5 +83,37 @@ public class MessageController {
         long userId = Long.parseLong(jwt.getSubject());
         messages.markRoomRead(roomId, userId);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<MessageResponse> uploadImage(
+            @PathVariable long roomId,
+            @RequestPart("file") MultipartFile file,
+            @AuthenticationPrincipal Jwt jwt
+    ) throws IOException {
+        if (file.getContentType() == null || !file.getContentType().startsWith("image/")) {
+            return ResponseEntity.badRequest().build();
+        }
+        if (file.getSize() > 10L * 1024 * 1024) {
+            return ResponseEntity.status(413).build();
+        }
+
+        String original = file.getOriginalFilename();
+        String ext = (original != null && original.contains("."))
+                ? original.substring(original.lastIndexOf('.'))
+                : "";
+        String filename = UUID.randomUUID() + ext;
+
+        var uploadsDir = Paths.get("uploads");
+        Files.createDirectories(uploadsDir);
+        Files.copy(file.getInputStream(), uploadsDir.resolve(filename), StandardCopyOption.REPLACE_EXISTING);
+
+        long userId = Long.parseLong(jwt.getSubject());
+        String imageUrl = "/uploads/" + filename;
+        MessageResponse response = messages.createImageMessage(roomId, userId, imageUrl);
+
+        ws.convertAndSend("/topic/rooms/" + roomId, response);
+
+        return ResponseEntity.ok(response);
     }
 }

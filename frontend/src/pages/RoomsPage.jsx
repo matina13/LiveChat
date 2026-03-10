@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import Picker from "@emoji-mart/react";
+import emojiData from "@emoji-mart/data/sets/15/twitter.json";
 import Sidebar from "../components/Sidebar";
 import { createRoom, joinRoom, listRooms, searchPublicRooms, getRoom, leaveRoom, deleteRoom, getRoomMembers, startDm, getPresence } from "../api/roomsApi";
-import { listMessages, sendMessage, editMessage, deleteMessage, markRoomRead } from "../api/messagesApi";
+import { listMessages, sendMessage, editMessage, deleteMessage, markRoomRead, uploadImage } from "../api/messagesApi";
 import { searchUsers } from "../api/usersApi";
 import { createStompClient } from "../api/wsClient";
+import { API_BASE } from "../api/client";
 import "./RoomsPage.css";
 
 function IconPlus() {
@@ -38,7 +41,20 @@ function IconCompose() {
     );
 }
 
+function IconImage() {
+    return (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+        </svg>
+    );
+}
+
 // ── Helpers ────────────────────────────────────────────────────
+const EMOJI_ONLY_RE = /^[\p{Emoji_Presentation}\p{Extended_Pictographic}\u200d\ufe0f\s]+$/u;
+function isEmojiOnly(text) {
+    return text.trim().length > 0 && EMOJI_ONLY_RE.test(text.trim());
+}
+
 function getRoomDisplayName(room) {
     return room.type === "direct" ? (room.otherUsername || "DM") : room.name;
 }
@@ -85,6 +101,11 @@ export default function RoomsPage() {
     const [messages, setMessages] = useState([]);
     const [messageState, setMessageState] = useState({ loading: false, error: "" });
     const [draft, setDraft] = useState("");
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+    const emojiPickerRef = useRef(null);
+    const composerInputRef = useRef(null);
+    const fileInputRef = useRef(null);
+    const [uploading, setUploading] = useState(false);
     const [editingMessageId, setEditingMessageId] = useState(null);
     const [editContent, setEditContent] = useState("");
 
@@ -165,6 +186,17 @@ export default function RoomsPage() {
         loadRooms();
         loadPublicRooms(0, "");
     }, []);
+
+    useEffect(() => {
+        if (!showEmojiPicker) return;
+        function handleClickOutside(e) {
+            if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target)) {
+                setShowEmojiPicker(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [showEmojiPicker]);
 
     // ── Active room + messages + members ────────────────────
     useEffect(() => {
@@ -510,6 +542,47 @@ export default function RoomsPage() {
         }
     }
 
+    function handleEmojiSelect(emoji) {
+        const input = composerInputRef.current;
+        const native = emoji.native;
+        if (input) {
+            const start = input.selectionStart;
+            const end = input.selectionEnd;
+            const newDraft = draft.slice(0, start) + native + draft.slice(end);
+            setDraft(newDraft);
+            // restore cursor after emoji
+            requestAnimationFrame(() => {
+                input.focus();
+                input.setSelectionRange(start + native.length, start + native.length);
+            });
+        } else {
+            setDraft((d) => d + native);
+        }
+        setShowEmojiPicker(false);
+    }
+
+    async function handleImageUpload(e) {
+        const file = e.target.files?.[0];
+        if (!file || !activeRoomId) return;
+        if (!file.type.startsWith("image/")) { showToast("err", "Images only."); return; }
+        if (file.size > 10 * 1024 * 1024) { showToast("err", "Max 10MB."); return; }
+
+        const formData = new FormData();
+        formData.append("file", file);
+        setUploading(true);
+        try {
+            const { data } = await uploadImage(activeRoomId, formData);
+            if (!clientRef.current?.connected) {
+                setMessages((prev) => [...prev, mapMessage(data, userId, username)]);
+            }
+        } catch (err) {
+            showToast("err", err?.response?.data?.error || "Upload failed.");
+        } finally {
+            setUploading(false);
+            e.target.value = "";
+        }
+    }
+
     // ── Derived ───────────────────────────────────────────────
     const isOwner = activeRoom && String(activeRoom.creatorId) === String(userId);
     const isDm = activeRoom?.type === "direct";
@@ -729,15 +802,26 @@ export default function RoomsPage() {
                                             </div>
                                         ) : (
                                             <div
-                                                className={`msg-bubble ${msg.deleted ? "msg-bubble--deleted" : ""}`}
+                                                className={`msg-bubble ${msg.deleted ? "msg-bubble--deleted" : ""} ${!msg.deleted && msg.messageType !== "image" && isEmojiOnly(msg.content) ? "msg-bubble--emoji-only" : ""}`}
                                                 onDoubleClick={() => {
-                                                    if (msg.isMe && !msg.deleted) {
+                                                    if (msg.isMe && !msg.deleted && msg.messageType !== "image") {
                                                         setEditingMessageId(msg.id);
                                                         setEditContent(msg.content);
                                                     }
                                                 }}
                                             >
-                                                <p>{msg.deleted ? "This message was deleted" : msg.content}</p>
+                                                {msg.deleted ? (
+                                                    <p>This message was deleted</p>
+                                                ) : msg.messageType === "image" ? (
+                                                    <img
+                                                        className="msg-image"
+                                                        src={`${API_BASE}${msg.content}`}
+                                                        alt="Shared image"
+                                                        onError={(e) => { e.target.style.display = "none"; }}
+                                                    />
+                                                ) : (
+                                                    <p>{msg.content}</p>
+                                                )}
                                                 {msg.editedAt && !msg.deleted && <span className="msg-edited">(edited)</span>}
                                             </div>
                                         )}
@@ -763,16 +847,51 @@ export default function RoomsPage() {
                             <div ref={messagesEndRef} />
                         </div>
 
-                        <form className="chat-composer" onSubmit={handleSend}>
-                            <input
-                                className="composer-input"
-                                placeholder="Type a message..."
-                                value={draft}
-                                onChange={handleDraftChange}
-                                disabled={!activeRoomId}
-                            />
-                            <button className="composer-send" type="submit" disabled={!activeRoomId || !draft.trim()}>Send</button>
-                        </form>
+                        <div className="composer-wrap">
+                            {showEmojiPicker && (
+                                <div className="emoji-picker-pop" ref={emojiPickerRef}>
+                                    <Picker
+                                        data={emojiData}
+                                        onEmojiSelect={handleEmojiSelect}
+                                        theme={document.documentElement.dataset.theme === "dark" ? "dark" : "light"}
+                                        set="twitter"
+                                        previewPosition="none"
+                                        skinTonePosition="none"
+                                        maxFrequentRows={2}
+                                    />
+                                </div>
+                            )}
+                            <form className="chat-composer" onSubmit={handleSend}>
+                                <input ref={fileInputRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleImageUpload} />
+                                <button
+                                    type="button"
+                                    className="composer-image-btn"
+                                    disabled={!activeRoomId || uploading}
+                                    onClick={() => fileInputRef.current?.click()}
+                                    title="Send image"
+                                >
+                                    <IconImage />
+                                </button>
+                                <input
+                                    ref={composerInputRef}
+                                    className="composer-input"
+                                    placeholder={uploading ? "Uploading..." : "Type a message..."}
+                                    value={draft}
+                                    onChange={handleDraftChange}
+                                    disabled={!activeRoomId || uploading}
+                                />
+                                <button
+                                    type="button"
+                                    className="composer-emoji-btn"
+                                    disabled={!activeRoomId || uploading}
+                                    onClick={() => setShowEmojiPicker((v) => !v)}
+                                    title="Insert emoji"
+                                >
+                                    😊
+                                </button>
+                                <button className="composer-send" type="submit" disabled={!activeRoomId || !draft.trim() || uploading}>Send</button>
+                            </form>
+                        </div>
                     </>
                 )}
             </div>
@@ -869,5 +988,6 @@ function mapMessage(message, userId, username) {
         isMe,
         deleted: message.deleted || false,
         editedAt: message.editedAt || null,
+        messageType: message.messageType || "text",
     };
 }

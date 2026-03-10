@@ -122,6 +122,30 @@ public class MessageService {
         members.updateLastReadAt(roomId, userId, OffsetDateTime.now());
     }
 
+    @Transactional
+    public MessageResponse createImageMessage(long roomId, long userId, String imageUrl) {
+        Room room = rooms.findById(roomId)
+                .orElseThrow(() -> new IllegalArgumentException("Room not found"));
+
+        if (!members.existsByRoom_IdAndUser_Id(roomId, userId)) {
+            throw new IllegalArgumentException("Not a room member");
+        }
+
+        User sender = users.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        Message message = new Message();
+        message.setRoom(room);
+        message.setSender(sender);
+        message.setContent(imageUrl);
+        message.setMessageType("image");
+
+        Message saved = messages.save(message);
+        room.setLastMessageAt(saved.getCreatedAt());
+
+        return toResponse(saved, "message");
+    }
+
     private MessageResponse toResponse(Message m, String type) {
         boolean deleted = m.getDeletedAt() != null;
         return new MessageResponse(
@@ -133,7 +157,8 @@ public class MessageService {
                 m.getCreatedAt(),
                 m.getEditedAt(),
                 deleted,
-                type
+                type,
+                m.getMessageType()
         );
     }
 }

@@ -34,6 +34,9 @@ public class Message {
     @Column(name = "edited_at")
     private OffsetDateTime editedAt;
 
+    @Column(name = "message_type", nullable = false)
+    private String messageType = "text";
+
     @PrePersist
     void prePersist() {
         if (createdAt == null) createdAt = OffsetDateTime.now();
@@ -51,4 +54,6 @@ public class Message {
     public void setDeletedAt(OffsetDateTime deletedAt) { this.deletedAt = deletedAt; }
     public OffsetDateTime getEditedAt() { return editedAt; }
     public void setEditedAt(OffsetDateTime editedAt) { this.editedAt = editedAt; }
+    public String getMessageType() { return messageType; }
+    public void setMessageType(String messageType) { this.messageType = messageType; }
 }
