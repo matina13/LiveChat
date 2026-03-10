@@ -3,15 +3,14 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import RoomsPage from "./pages/RoomsPage";
+import { isTokenValid } from "./utils/auth";
 
 function PrivateRoute({ children }) {
-    return localStorage.getItem("authToken")
-        ? children
-        : <Navigate to="/login" replace />;
+    return isTokenValid() ? children : <Navigate to="/login" replace />;
 }
 
 export default function App() {
-    const isAuthed = Boolean(localStorage.getItem("authToken"));
+    const isAuthed = isTokenValid();
     return (
         <Routes>
             <Route path="/" element={<Navigate to={isAuthed ? "/home" : "/login"} replace />} />

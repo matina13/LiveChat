@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import { login } from "../api/authApi";
+import { isTokenValid } from "../utils/auth";
 import "../App.css";
 
 export default function LoginPage() {
@@ -8,7 +9,7 @@ export default function LoginPage() {
     const [form, setForm] = useState({ email: "", password: "" });
     const [status, setStatus] = useState({ type: "", text: "" });
 
-    if (localStorage.getItem("authToken")) return <Navigate to="/home" replace />;
+    if (isTokenValid()) return <Navigate to="/home" replace />;
 
     function handleChange(e) {
         const { name, value } = e.target;
@@ -30,6 +31,7 @@ export default function LoginPage() {
                 password: form.password,
             });
             localStorage.setItem("authToken", data.token);
+            localStorage.setItem("refreshToken", data.refreshToken);
             localStorage.setItem("authUsername", data.username);
             localStorage.setItem("authEmail", data.email);
             setStatus({ type: "ok", text: `Welcome back, ${data.username}!` });

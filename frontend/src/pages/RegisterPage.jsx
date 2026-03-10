@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import { register } from "../api/authApi";
+import { isTokenValid } from "../utils/auth";
 import "../App.css";
 
 export default function RegisterPage() {
@@ -37,7 +38,7 @@ export default function RegisterPage() {
     const allPasswordOk = rules.minLen && rules.hasCapital && rules.hasSpecial;
     const allOk = allPasswordOk && rules.confirmOk;
 
-    if (localStorage.getItem("authToken")) return <Navigate to="/home" replace />;
+    if (isTokenValid()) return <Navigate to="/home" replace />;
 
     function handleChange(e) {
         const { name, value } = e.target;
