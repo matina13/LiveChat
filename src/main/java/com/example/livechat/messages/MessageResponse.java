@@ -1,6 +1,8 @@
 package com.example.livechat.messages;
 
 import java.time.OffsetDateTime;
+import java.util.Map;
+import java.util.Set;
 
 public record MessageResponse(
         Long id,
@@ -12,5 +14,10 @@ public record MessageResponse(
         OffsetDateTime editedAt,
         boolean deleted,
         String type,           // "message" | "edit" | "delete"  — used by WS clients
-        String messageType     // "text" | "image"
+        String messageType,    // "text" | "image"
+        Map<String, Long> reactions,        // emoji → count
+        Set<String> myReactions,            // emojis the requesting user has reacted with
+        Long replyToId,
+        String replyToSenderUsername,
+        String replyToContent               // null if reply-to was deleted
 ) {}

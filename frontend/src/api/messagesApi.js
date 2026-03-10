@@ -6,3 +6,4 @@ export function editMessage(roomId, messageId, data)      { return api.patch(`/a
 export function deleteMessage(roomId, messageId)          { return api.delete(`/api/rooms/${roomId}/messages/${messageId}`); }
 export function markRoomRead(roomId)                      { return api.post(`/api/rooms/${roomId}/messages/read`); }
 export function uploadImage(roomId, formData)              { return api.post(`/api/rooms/${roomId}/messages/upload`, formData); }
+export function toggleReaction(roomId, messageId, data)   { return api.post(`/api/rooms/${roomId}/messages/${messageId}/reactions`, data); }

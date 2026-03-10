@@ -85,6 +85,19 @@ public class MessageController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/{messageId}/reactions")
+    public ResponseEntity<?> toggleReaction(
+            @PathVariable long roomId,
+            @PathVariable long messageId,
+            @RequestBody Map<String, String> body,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        long userId = Long.parseLong(jwt.getSubject());
+        var result = messages.toggleReaction(roomId, messageId, userId, body.get("emoji"));
+        ws.convertAndSend("/topic/rooms/" + roomId, result);
+        return ResponseEntity.ok(result);
+    }
+
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<MessageResponse> uploadImage(
             @PathVariable long roomId,

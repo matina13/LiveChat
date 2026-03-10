@@ -37,6 +37,10 @@ public class Message {
     @Column(name = "message_type", nullable = false)
     private String messageType = "text";
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reply_to_id")
+    private Message replyTo;
+
     @PrePersist
     void prePersist() {
         if (createdAt == null) createdAt = OffsetDateTime.now();
@@ -56,4 +60,6 @@ public class Message {
     public void setEditedAt(OffsetDateTime editedAt) { this.editedAt = editedAt; }
     public String getMessageType() { return messageType; }
     public void setMessageType(String messageType) { this.messageType = messageType; }
+    public Message getReplyTo() { return replyTo; }
+    public void setReplyTo(Message replyTo) { this.replyTo = replyTo; }
 }

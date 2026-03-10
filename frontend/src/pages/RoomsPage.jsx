@@ -3,7 +3,7 @@ import Picker from "@emoji-mart/react";
 import emojiData from "@emoji-mart/data/sets/15/twitter.json";
 import Sidebar from "../components/Sidebar";
 import { createRoom, joinRoom, listRooms, searchPublicRooms, getRoom, leaveRoom, deleteRoom, getRoomMembers, startDm, getPresence } from "../api/roomsApi";
-import { listMessages, sendMessage, editMessage, deleteMessage, markRoomRead, uploadImage } from "../api/messagesApi";
+import { listMessages, sendMessage, editMessage, deleteMessage, markRoomRead, uploadImage, toggleReaction } from "../api/messagesApi";
 import { searchUsers } from "../api/usersApi";
 import { createStompClient } from "../api/wsClient";
 import { API_BASE } from "../api/client";
@@ -48,6 +48,16 @@ function IconImage() {
         </svg>
     );
 }
+
+function IconReply() {
+    return (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M10 9V5l-7 7 7 7v-4.1c5 0 8.5 1.6 11 5.1-1-5-4-10-11-11z"/>
+        </svg>
+    );
+}
+
+const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
 
 // ── Helpers ────────────────────────────────────────────────────
 const EMOJI_ONLY_RE = /^[\p{Emoji_Presentation}\p{Extended_Pictographic}\u200d\ufe0f\s]+$/u;
@@ -108,6 +118,7 @@ export default function RoomsPage() {
     const [uploading, setUploading] = useState(false);
     const [editingMessageId, setEditingMessageId] = useState(null);
     const [editContent, setEditContent] = useState("");
+    const [replyingTo, setReplyingTo] = useState(null); // { id, author, content, messageType }
 
     // Typing
     const [typers, setTypers] = useState({});
@@ -296,6 +307,12 @@ export default function RoomsPage() {
                         setMessages((prev) => prev.map((m) =>
                             m.id === payload.id ? { ...m, deleted: true, content: null } : m
                         ));
+                    } else if (payload.type === "reaction") {
+                        setMessages((prev) => prev.map((m) =>
+                            m.id === payload.messageId
+                                ? { ...m, reactions: payload.reactions || {} }
+                                : m
+                        ));
                     } else {
                         setMessages((prev) => [...prev, mapMessage(payload, userId, username)]);
                     }
@@ -400,6 +417,7 @@ export default function RoomsPage() {
         resubscribeRef.current?.(activeRoomId);
         setEditingMessageId(null);
         setEditContent("");
+        setReplyingTo(null);
         if (activeRoomId) {
             setUnreadCounts((prev) => {
                 if (!prev[activeRoomId]) return prev;
@@ -521,15 +539,18 @@ export default function RoomsPage() {
         const text = draft.trim();
         if (!text || !activeRoomId) return;
 
+        const payload = { content: text, ...(replyingTo ? { replyToId: replyingTo.id } : {}) };
+
         const client = clientRef.current;
         if (client && client.connected) {
-            client.publish({ destination: `/app/rooms/${activeRoomId}/send`, body: JSON.stringify({ content: text }) });
+            client.publish({ destination: `/app/rooms/${activeRoomId}/send`, body: JSON.stringify(payload) });
             setDraft("");
+            setReplyingTo(null);
             return;
         }
 
-        sendMessage(activeRoomId, { content: text })
-            .then(({ data }) => { setMessages((prev) => [...prev, mapMessage(data, userId, username)]); setDraft(""); })
+        sendMessage(activeRoomId, payload)
+            .then(({ data }) => { setMessages((prev) => [...prev, mapMessage(data, userId, username)]); setDraft(""); setReplyingTo(null); })
             .catch(() => showToast("err", "Message failed to send."));
     }
 
@@ -580,6 +601,31 @@ export default function RoomsPage() {
         } finally {
             setUploading(false);
             e.target.value = "";
+        }
+    }
+
+    async function handleReaction(messageId, emoji) {
+        if (!activeRoomId) return;
+        // Optimistic update
+        setMessages((prev) => prev.map((m) => {
+            if (m.id !== messageId) return m;
+            const hasIt = (m.myReactions || []).includes(emoji);
+            const newCount = (m.reactions?.[emoji] || 0) + (hasIt ? -1 : 1);
+            const newReactions = { ...m.reactions };
+            if (newCount <= 0) delete newReactions[emoji];
+            else newReactions[emoji] = newCount;
+            return {
+                ...m,
+                reactions: newReactions,
+                myReactions: hasIt
+                    ? (m.myReactions || []).filter((e) => e !== emoji)
+                    : [...(m.myReactions || []), emoji],
+            };
+        }));
+        try {
+            await toggleReaction(activeRoomId, messageId, { emoji });
+        } catch {
+            showToast("err", "Failed to react.");
         }
     }
 
@@ -801,32 +847,67 @@ export default function RoomsPage() {
                                                 <span className="msg-edit-hint">Enter to save · Esc to cancel</span>
                                             </div>
                                         ) : (
-                                            <div
-                                                className={`msg-bubble ${msg.deleted ? "msg-bubble--deleted" : ""} ${!msg.deleted && msg.messageType !== "image" && isEmojiOnly(msg.content) ? "msg-bubble--emoji-only" : ""}`}
-                                                onDoubleClick={() => {
-                                                    if (msg.isMe && !msg.deleted && msg.messageType !== "image") {
-                                                        setEditingMessageId(msg.id);
-                                                        setEditContent(msg.content);
-                                                    }
-                                                }}
-                                            >
-                                                {msg.deleted ? (
-                                                    <p>This message was deleted</p>
-                                                ) : msg.messageType === "image" ? (
-                                                    <img
-                                                        className="msg-image"
-                                                        src={`${API_BASE}${msg.content}`}
-                                                        alt="Shared image"
-                                                        onError={(e) => { e.target.style.display = "none"; }}
-                                                    />
-                                                ) : (
-                                                    <p>{msg.content}</p>
+                                            <div className="msg-bubble-wrap">
+                                                {!msg.deleted && (
+                                                    <div className="msg-reaction-bar">
+                                                        {QUICK_EMOJIS.map((e) => (
+                                                            <button key={e} className="reaction-quick-btn" onClick={() => handleReaction(msg.id, e)}>{e}</button>
+                                                        ))}
+                                                    </div>
                                                 )}
-                                                {msg.editedAt && !msg.deleted && <span className="msg-edited">(edited)</span>}
+                                                <div
+                                                    className={`msg-bubble ${msg.deleted ? "msg-bubble--deleted" : ""} ${!msg.deleted && msg.messageType !== "image" && isEmojiOnly(msg.content) ? "msg-bubble--emoji-only" : ""}`}
+                                                    onDoubleClick={() => {
+                                                        if (msg.isMe && !msg.deleted && msg.messageType !== "image") {
+                                                            setEditingMessageId(msg.id);
+                                                            setEditContent(msg.content);
+                                                        }
+                                                    }}
+                                                >
+                                                    {msg.replyToId && (
+                                                        <div className="reply-quote">
+                                                            <span className="reply-quote-author">{msg.replyToSenderUsername}</span>
+                                                            <span className="reply-quote-content">
+                                                                {msg.replyToContent ?? "Message deleted"}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    {msg.deleted ? (
+                                                        <p>This message was deleted</p>
+                                                    ) : msg.messageType === "image" ? (
+                                                        <img
+                                                            className="msg-image"
+                                                            src={`${API_BASE}${msg.content}`}
+                                                            alt="Shared image"
+                                                            onError={(e) => { e.target.style.display = "none"; }}
+                                                        />
+                                                    ) : (
+                                                        <p>{msg.content}</p>
+                                                    )}
+                                                    {msg.editedAt && !msg.deleted && <span className="msg-edited">(edited)</span>}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {Object.keys(msg.reactions || {}).length > 0 && (
+                                            <div className="msg-reactions">
+                                                {Object.entries(msg.reactions).map(([emoji, count]) => (
+                                                    <button
+                                                        key={emoji}
+                                                        className={`reaction-pill ${(msg.myReactions || []).includes(emoji) ? "reaction-pill--mine" : ""}`}
+                                                        onClick={() => handleReaction(msg.id, emoji)}
+                                                    >
+                                                        {emoji} <span>{count}</span>
+                                                    </button>
+                                                ))}
                                             </div>
                                         )}
                                         <div className="msg-time-row">
                                             <span className="msg-time">{msg.time}</span>
+                                            {!msg.deleted && editingMessageId !== msg.id && (
+                                                <button className="msg-reply-btn" onClick={() => { setReplyingTo({ id: msg.id, author: msg.author, content: msg.messageType === "image" ? "📷 Image" : msg.content, messageType: msg.messageType }); composerInputRef.current?.focus(); }} title="Reply">
+                                                    <IconReply />
+                                                </button>
+                                            )}
                                             {msg.isMe && !msg.deleted && editingMessageId !== msg.id && (
                                                 <button className="msg-delete" onClick={() => handleDeleteMessage(msg.id)} title="Delete message">
                                                     <IconTrash />
@@ -848,6 +929,15 @@ export default function RoomsPage() {
                         </div>
 
                         <div className="composer-wrap">
+                            {replyingTo && (
+                                <div className="reply-bar">
+                                    <div className="reply-bar-body">
+                                        <span className="reply-bar-author">Replying to {replyingTo.author}</span>
+                                        <span className="reply-bar-preview">{replyingTo.content}</span>
+                                    </div>
+                                    <button className="reply-bar-cancel" onClick={() => setReplyingTo(null)} title="Cancel reply">✕</button>
+                                </div>
+                            )}
                             {showEmojiPicker && (
                                 <div className="emoji-picker-pop" ref={emojiPickerRef}>
                                     <Picker
@@ -989,5 +1079,10 @@ function mapMessage(message, userId, username) {
         deleted: message.deleted || false,
         editedAt: message.editedAt || null,
         messageType: message.messageType || "text",
+        reactions: message.reactions || {},
+        myReactions: message.myReactions || [],
+        replyToId: message.replyToId || null,
+        replyToSenderUsername: message.replyToSenderUsername || null,
+        replyToContent: message.replyToContent || null,
     };
 }

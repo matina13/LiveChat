@@ -12,6 +12,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class MessageService {
@@ -20,17 +24,20 @@ public class MessageService {
     private final RoomRepository rooms;
     private final RoomMemberRepository members;
     private final UserRepository users;
+    private final MessageReactionRepository reactions;
 
     public MessageService(
             MessageRepository messages,
             RoomRepository rooms,
             RoomMemberRepository members,
-            UserRepository users
+            UserRepository users,
+            MessageReactionRepository reactions
     ) {
         this.messages = messages;
         this.rooms = rooms;
         this.members = members;
         this.users = users;
+        this.reactions = reactions;
     }
 
     @Transactional
@@ -50,10 +57,19 @@ public class MessageService {
         message.setSender(sender);
         message.setContent(request.content().trim());
 
+        if (request.replyToId() != null) {
+            Message replyTo = messages.findById(request.replyToId())
+                    .orElseThrow(() -> new IllegalArgumentException("Reply-to message not found"));
+            if (!replyTo.getRoom().getId().equals(roomId)) {
+                throw new IllegalArgumentException("Cannot reply to a message in another room");
+            }
+            message.setReplyTo(replyTo);
+        }
+
         Message saved = messages.save(message);
         room.setLastMessageAt(saved.getCreatedAt());
 
-        return toResponse(saved, "message");
+        return toResponse(saved, "message", userId, List.of());
     }
 
     @Transactional
@@ -75,7 +91,7 @@ public class MessageService {
         message.setEditedAt(OffsetDateTime.now());
         Message saved = messages.save(message);
 
-        return toResponse(saved, "edit");
+        return toResponse(saved, "edit", userId, reactions.findByMessage_Id(saved.getId()));
     }
 
     @Transactional
@@ -109,8 +125,12 @@ public class MessageService {
 
         Page<Message> results = messages.findByRoom_IdOrderByCreatedAtDesc(roomId, PageRequest.of(page, size));
 
+        List<Long> msgIds = results.stream().map(Message::getId).toList();
+        Map<Long, List<MessageReaction>> rxnsByMsg = reactions.findByMessage_IdIn(msgIds).stream()
+                .collect(Collectors.groupingBy(r -> r.getMessage().getId()));
+
         List<MessageResponse> response = results.stream()
-                .map(m -> toResponse(m, "message"))
+                .map(m -> toResponse(m, "message", userId, rxnsByMsg.getOrDefault(m.getId(), List.of())))
                 .toList();
 
         return new MessagesResponse(response, results.getNumber(), results.getSize(), results.getTotalElements());
@@ -143,11 +163,58 @@ public class MessageService {
         Message saved = messages.save(message);
         room.setLastMessageAt(saved.getCreatedAt());
 
-        return toResponse(saved, "message");
+        return toResponse(saved, "message", userId, List.of());
     }
 
-    private MessageResponse toResponse(Message m, String type) {
+    @Transactional
+    public Map<String, Object> toggleReaction(long roomId, long messageId, long userId, String emoji) {
+        if (emoji == null || emoji.isBlank() || emoji.length() > 10) {
+            throw new IllegalArgumentException("Invalid emoji");
+        }
+
+        Message message = messages.findById(messageId)
+                .orElseThrow(() -> new IllegalArgumentException("Message not found"));
+        if (!message.getRoom().getId().equals(roomId)) {
+            throw new IllegalArgumentException("Message not in this room");
+        }
+        if (!members.existsByRoom_IdAndUser_Id(roomId, userId)) {
+            throw new IllegalArgumentException("Not a room member");
+        }
+        if (message.getDeletedAt() != null) {
+            throw new IllegalArgumentException("Cannot react to a deleted message");
+        }
+
+        Optional<MessageReaction> existing = reactions.findByMessage_IdAndUser_IdAndEmoji(messageId, userId, emoji);
+        if (existing.isPresent()) {
+            reactions.delete(existing.get());
+        } else {
+            User user = users.findById(userId)
+                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            MessageReaction reaction = new MessageReaction();
+            reaction.setMessage(message);
+            reaction.setUser(user);
+            reaction.setEmoji(emoji);
+            reactions.save(reaction);
+        }
+
+        Map<String, Long> counts = reactions.findByMessage_Id(messageId).stream()
+                .collect(Collectors.groupingBy(MessageReaction::getEmoji, Collectors.counting()));
+
+        return Map.of("type", "reaction", "messageId", messageId, "reactions", counts);
+    }
+
+    private MessageResponse toResponse(Message m, String type, long userId, List<MessageReaction> rxns) {
         boolean deleted = m.getDeletedAt() != null;
+        Map<String, Long> reactionCounts = rxns.stream()
+                .collect(Collectors.groupingBy(MessageReaction::getEmoji, Collectors.counting()));
+        Set<String> myReactions = rxns.stream()
+                .filter(r -> r.getUser().getId().equals(userId))
+                .map(MessageReaction::getEmoji)
+                .collect(Collectors.toSet());
+        Message replyTo = m.getReplyTo();
+        Long replyToId = replyTo != null ? replyTo.getId() : null;
+        String replyToSenderUsername = replyTo != null ? replyTo.getSender().getUsername() : null;
+        String replyToContent = replyTo != null && replyTo.getDeletedAt() == null ? replyTo.getContent() : null;
         return new MessageResponse(
                 m.getId(),
                 m.getRoom().getId(),
@@ -158,7 +225,12 @@ public class MessageService {
                 m.getEditedAt(),
                 deleted,
                 type,
-                m.getMessageType()
+                m.getMessageType(),
+                reactionCounts,
+                myReactions,
+                replyToId,
+                replyToSenderUsername,
+                replyToContent
         );
     }
 }
