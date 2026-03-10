@@ -1,79 +1,14 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import Picker from "@emoji-mart/react";
-import emojiData from "@emoji-mart/data/sets/15/twitter.json";
 import Sidebar from "../components/Sidebar";
+import ChatList from "../components/ChatList";
+import ChatMain from "../components/ChatMain";
+import RoomInfo from "../components/RoomInfo";
 import { createRoom, joinRoom, listRooms, searchPublicRooms, getRoom, leaveRoom, deleteRoom, getRoomMembers, startDm, getPresence } from "../api/roomsApi";
 import { listMessages, sendMessage, editMessage, deleteMessage, markRoomRead, uploadImage, toggleReaction } from "../api/messagesApi";
 import { searchUsers } from "../api/usersApi";
 import { createStompClient } from "../api/wsClient";
-import { API_BASE } from "../api/client";
 import "./RoomsPage.css";
 
-function IconPlus() {
-    return (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
-        </svg>
-    );
-}
-
-function IconChat() {
-    return (
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z" />
-        </svg>
-    );
-}
-
-function IconTrash() {
-    return (
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
-        </svg>
-    );
-}
-
-function IconCompose() {
-    return (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
-        </svg>
-    );
-}
-
-function IconImage() {
-    return (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
-        </svg>
-    );
-}
-
-function IconReply() {
-    return (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M10 9V5l-7 7 7 7v-4.1c5 0 8.5 1.6 11 5.1-1-5-4-10-11-11z"/>
-        </svg>
-    );
-}
-
-const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
-
-// ── Helpers ────────────────────────────────────────────────────
-const EMOJI_ONLY_RE = /^[\p{Emoji_Presentation}\p{Extended_Pictographic}\u200d\ufe0f\s]+$/u;
-function isEmojiOnly(text) {
-    return text.trim().length > 0 && EMOJI_ONLY_RE.test(text.trim());
-}
-
-function getRoomDisplayName(room) {
-    return room.type === "direct" ? (room.otherUsername || "DM") : room.name;
-}
-
-function getRoomInitial(room) {
-    return getRoomDisplayName(room).charAt(0).toUpperCase();
-}
-
-// ── Component ─────────────────────────────────────────────────
 export default function RoomsPage() {
     const username = localStorage.getItem("authUsername") || "You";
     const token = localStorage.getItem("authToken");
@@ -111,14 +46,18 @@ export default function RoomsPage() {
     const [messages, setMessages] = useState([]);
     const [messageState, setMessageState] = useState({ loading: false, error: "" });
     const [draft, setDraft] = useState("");
-    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-    const emojiPickerRef = useRef(null);
-    const composerInputRef = useRef(null);
     const fileInputRef = useRef(null);
     const [uploading, setUploading] = useState(false);
     const [editingMessageId, setEditingMessageId] = useState(null);
     const [editContent, setEditContent] = useState("");
-    const [replyingTo, setReplyingTo] = useState(null); // { id, author, content, messageType }
+    const [replyingTo, setReplyingTo] = useState(null);
+
+    // Pagination / infinite scroll
+    const [hasMoreMessages, setHasMoreMessages] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const msgPageRef = useRef(0);
+    const chatStreamRef = useRef(null);
+    const scrollRestoreRef = useRef(null);
 
     // Typing
     const [typers, setTypers] = useState({});
@@ -133,7 +72,7 @@ export default function RoomsPage() {
     const clientRef = useRef(null);
     const subscriptionRef = useRef(null);
     const typingSubRef = useRef(null);
-    const presenceSubsRef = useRef({});   // roomId → subscription
+    const presenceSubsRef = useRef({});
     const notifSubRef = useRef(null);
     const resubscribeRef = useRef(null);
     const activeRoomIdRef = useRef(null);
@@ -154,7 +93,6 @@ export default function RoomsPage() {
         const typerUserId = String(payload.userId);
         if (typerUserId === String(userId)) return;
         const typerUsername = payload.username || "Someone";
-
         if (typerTimersRef.current[typerUserId]) clearTimeout(typerTimersRef.current[typerUserId]);
         setTypers((prev) => ({ ...prev, [typerUserId]: typerUsername }));
         typerTimersRef.current[typerUserId] = setTimeout(() => {
@@ -198,27 +136,20 @@ export default function RoomsPage() {
         loadPublicRooms(0, "");
     }, []);
 
-    useEffect(() => {
-        if (!showEmojiPicker) return;
-        function handleClickOutside(e) {
-            if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target)) {
-                setShowEmojiPicker(false);
-            }
-        }
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, [showEmojiPicker]);
-
     // ── Active room + messages + members ────────────────────
     useEffect(() => {
         if (!activeRoomId) {
             setActiveRoom(null);
             setMessages([]);
             setRoomMembers([]);
+            setHasMoreMessages(false);
+            msgPageRef.current = 0;
             return;
         }
 
         let active = true;
+        setHasMoreMessages(false);
+        msgPageRef.current = 0;
         async function load() {
             setMessages([]);
             setMessageState({ loading: true, error: "" });
@@ -244,6 +175,7 @@ export default function RoomsPage() {
                     return [...normalized, ...live];
                 });
                 setRoomMembers(membersRes.data);
+                setHasMoreMessages(50 < msgRes.data.total);
                 setMessageState({ loading: false, error: "" });
             } catch (err) {
                 if (!active) return;
@@ -261,9 +193,17 @@ export default function RoomsPage() {
         setTypers({});
     }, [activeRoomId]);
 
-    // ── Auto-scroll ──────────────────────────────────────────
+    // ── Auto-scroll / scroll restore ─────────────────────────
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        const stream = chatStreamRef.current;
+        if (scrollRestoreRef.current !== null) {
+            if (stream) stream.scrollTop = stream.scrollHeight - scrollRestoreRef.current;
+            scrollRestoreRef.current = null;
+            return;
+        }
+        if (!stream || stream.scrollHeight - stream.scrollTop - stream.clientHeight < 120) {
+            messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        }
     }, [messages]);
 
     // ── Close DM search on outside click ────────────────────
@@ -299,9 +239,7 @@ export default function RoomsPage() {
                     const payload = JSON.parse(msg.body);
                     if (payload.type === "edit") {
                         setMessages((prev) => prev.map((m) =>
-                            m.id === payload.id
-                                ? { ...m, content: payload.content, editedAt: payload.editedAt }
-                                : m
+                            m.id === payload.id ? { ...m, content: payload.content, editedAt: payload.editedAt } : m
                         ));
                     } else if (payload.type === "delete") {
                         setMessages((prev) => prev.map((m) =>
@@ -309,9 +247,7 @@ export default function RoomsPage() {
                         ));
                     } else if (payload.type === "reaction") {
                         setMessages((prev) => prev.map((m) =>
-                            m.id === payload.messageId
-                                ? { ...m, reactions: payload.reactions || {} }
-                                : m
+                            m.id === payload.messageId ? { ...m, reactions: payload.reactions || {} } : m
                         ));
                     } else {
                         setMessages((prev) => [...prev, mapMessage(payload, userId, username)]);
@@ -327,20 +263,16 @@ export default function RoomsPage() {
         client.onConnect = () => {
             client._resetReconnect();
             setWsConnected(true);
-
-            // Personal notification channel — receives events for ALL rooms, not just the active one
             notifSubRef.current = client.subscribe(
                 `/topic/users/${userId}/notifications`,
                 (msg) => {
                     const payload = JSON.parse(msg.body);
                     const roomId = payload.roomId;
-                    // Only count as unread if this room isn't currently open
                     if (String(roomId) !== String(activeRoomIdRef.current)) {
                         setUnreadCounts((prev) => ({ ...prev, [roomId]: (prev[roomId] || 0) + 1 }));
                     }
                 }
             );
-
             resubscribe(activeRoomIdRef.current);
         };
         client.onDisconnect = () => {
@@ -378,16 +310,12 @@ export default function RoomsPage() {
         if (!client?.connected || rooms.length === 0) return;
 
         const currentIds = new Set(rooms.map((r) => String(r.id)));
-
-        // Unsubscribe rooms no longer in list
         Object.keys(presenceSubsRef.current).forEach((id) => {
             if (!currentIds.has(id)) {
                 presenceSubsRef.current[id].unsubscribe();
                 delete presenceSubsRef.current[id];
             }
         });
-
-        // Subscribe to new rooms
         rooms.forEach((room) => {
             const key = String(room.id);
             if (!presenceSubsRef.current[key]) {
@@ -400,10 +328,6 @@ export default function RoomsPage() {
                 );
             }
         });
-
-        // Refresh presence state now that subscriptions are active.
-        // The backend broadcasts on connect but React hasn't subscribed yet at that
-        // moment, so we re-fetch via HTTP to get the current snapshot.
         getPresence().then(({ data: onlineIds }) => {
             const map = {};
             onlineIds.forEach((id) => { map[String(id)] = true; });
@@ -563,25 +487,6 @@ export default function RoomsPage() {
         }
     }
 
-    function handleEmojiSelect(emoji) {
-        const input = composerInputRef.current;
-        const native = emoji.native;
-        if (input) {
-            const start = input.selectionStart;
-            const end = input.selectionEnd;
-            const newDraft = draft.slice(0, start) + native + draft.slice(end);
-            setDraft(newDraft);
-            // restore cursor after emoji
-            requestAnimationFrame(() => {
-                input.focus();
-                input.setSelectionRange(start + native.length, start + native.length);
-            });
-        } else {
-            setDraft((d) => d + native);
-        }
-        setShowEmojiPicker(false);
-    }
-
     async function handleImageUpload(e) {
         const file = e.target.files?.[0];
         if (!file || !activeRoomId) return;
@@ -606,7 +511,6 @@ export default function RoomsPage() {
 
     async function handleReaction(messageId, emoji) {
         if (!activeRoomId) return;
-        // Optimistic update
         setMessages((prev) => prev.map((m) => {
             if (m.id !== messageId) return m;
             const hasIt = (m.myReactions || []).includes(emoji);
@@ -629,6 +533,25 @@ export default function RoomsPage() {
         }
     }
 
+    async function loadMoreMessages() {
+        if (loadingMore || !hasMoreMessages || !activeRoomId) return;
+        const stream = chatStreamRef.current;
+        if (stream) scrollRestoreRef.current = stream.scrollHeight - stream.scrollTop;
+        setLoadingMore(true);
+        const nextPage = msgPageRef.current + 1;
+        try {
+            const { data } = await listMessages(activeRoomId, { page: nextPage, size: 50 });
+            const older = data.messages.slice().reverse().map((m) => mapMessage(m, userId, username));
+            setMessages((prev) => [...older, ...prev]);
+            msgPageRef.current = nextPage;
+            setHasMoreMessages((nextPage + 1) * 50 < data.total);
+        } catch {
+            showToast("err", "Failed to load older messages.");
+        } finally {
+            setLoadingMore(false);
+        }
+    }
+
     // ── Derived ───────────────────────────────────────────────
     const isOwner = activeRoom && String(activeRoom.creatorId) === String(userId);
     const isDm = activeRoom?.type === "direct";
@@ -641,417 +564,47 @@ export default function RoomsPage() {
         <div className="app-shell">
             <Sidebar />
 
-            {/* ── Left: chat list ── */}
-            <div className="list-panel">
-                <div className="list-panel-header">
-                    <h2 className="list-panel-title">Chats</h2>
-                    <div className="list-panel-actions">
-                        <button className="icon-btn" title="New direct message" onClick={() => { setShowDmSearch((s) => !s); setShowNewRoom(false); }}>
-                            <IconCompose />
-                        </button>
-                        <button className="icon-btn" onClick={() => { setShowNewRoom((s) => !s); setShowDmSearch(false); }} title="New group">
-                            <IconPlus />
-                        </button>
-                    </div>
-                </div>
+            <ChatList
+                rooms={rooms} dmRooms={dmRooms} groupRooms={groupRooms}
+                activeRoomId={activeRoomId} setActiveRoomId={setActiveRoomId}
+                unreadCounts={unreadCounts} onlineUsers={onlineUsers}
+                activeTab={activeTab} setActiveTab={setActiveTab}
+                publicQuery={publicQuery} setPublicQuery={setPublicQuery}
+                publicRooms={publicRooms} publicState={publicState} loadPublicRooms={loadPublicRooms}
+                roomsState={roomsState}
+                showDmSearch={showDmSearch} setShowDmSearch={setShowDmSearch}
+                dmQuery={dmQuery} dmResults={dmResults} dmLoading={dmLoading}
+                handleDmQueryChange={handleDmQueryChange} handleStartDm={handleStartDm} dmSearchRef={dmSearchRef}
+                showNewRoom={showNewRoom} setShowNewRoom={setShowNewRoom}
+                roomName={roomName} setRoomName={setRoomName}
+                isPrivate={isPrivate} setIsPrivate={setIsPrivate}
+                handleCreateRoom={handleCreateRoom}
+                handleJoinPublicRoom={handleJoinPublicRoom}
+            />
 
-                {/* DM user search popover */}
-                {showDmSearch && (
-                    <div className="dm-search-popover" ref={dmSearchRef}>
-                        <input
-                            className="lc-input"
-                            placeholder="Search users..."
-                            value={dmQuery}
-                            onChange={handleDmQueryChange}
-                            autoFocus
-                        />
-                        {dmLoading && <p className="dm-search-hint">Searching...</p>}
-                        {!dmLoading && dmQuery && dmResults.length === 0 && (
-                            <p className="dm-search-hint">No users found.</p>
-                        )}
-                        {dmResults.map((u) => (
-                            <button key={u.id} className="dm-search-result" onClick={() => handleStartDm(u.id)}>
-                                <div className="dm-search-avatar">{u.username.charAt(0).toUpperCase()}</div>
-                                <span>{u.username}</span>
-                            </button>
-                        ))}
-                    </div>
-                )}
+            <ChatMain
+                activeRoom={activeRoom} activeRoomId={activeRoomId} isDm={isDm} wsConnected={wsConnected}
+                messages={messages} messageState={messageState}
+                typerList={typerList}
+                loadingMore={loadingMore} hasMoreMessages={hasMoreMessages}
+                chatStreamRef={chatStreamRef} messagesEndRef={messagesEndRef}
+                loadMoreMessages={loadMoreMessages}
+                handleReaction={handleReaction}
+                handleDeleteMessage={handleDeleteMessage}
+                handleEditMessage={handleEditMessage}
+                editingMessageId={editingMessageId} setEditingMessageId={setEditingMessageId}
+                editContent={editContent} setEditContent={setEditContent}
+                replyingTo={replyingTo} setReplyingTo={setReplyingTo}
+                draft={draft} setDraft={setDraft} handleDraftChange={handleDraftChange} handleSend={handleSend}
+                uploading={uploading} fileInputRef={fileInputRef} handleImageUpload={handleImageUpload}
+            />
 
-                {showNewRoom && (
-                    <div className="new-room-form">
-                        <input
-                            className="lc-input"
-                            placeholder="Room name"
-                            value={roomName}
-                            onChange={(e) => setRoomName(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && handleCreateRoom()}
-                            autoFocus
-                        />
-                        <div className="new-room-row">
-                            <label className="lc-toggle">
-                                <input type="checkbox" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} />
-                                Private
-                            </label>
-                            <div className="new-room-actions">
-                                <button className="text-btn" onClick={() => { setShowNewRoom(false); setRoomName(""); setIsPrivate(false); }}>Cancel</button>
-                                <button className="lc-btn-primary" onClick={handleCreateRoom}>Create</button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                <div className="list-tabs">
-                    <button className={`list-tab ${activeTab === "chats" ? "list-tab--active" : ""}`} onClick={() => setActiveTab("chats")}>Your Chats</button>
-                    <button className={`list-tab ${activeTab === "discover" ? "list-tab--active" : ""}`} onClick={() => { setActiveTab("discover"); loadPublicRooms(0, publicQuery); }}>Discover</button>
-                </div>
-
-                {activeTab === "discover" && (
-                    <div className="list-search">
-                        <input
-                            className="lc-input"
-                            placeholder="Search public rooms..."
-                            value={publicQuery}
-                            onChange={(e) => setPublicQuery(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && loadPublicRooms(0, publicQuery)}
-                        />
-                    </div>
-                )}
-
-                <div className="list-body">
-                    {activeTab === "chats" && (
-                        <>
-                            {roomsState.loading && <p className="list-empty">Loading...</p>}
-                            {roomsState.error && <p className="list-empty list-empty--err">{roomsState.error}</p>}
-                            {!roomsState.loading && !roomsState.error && rooms.length === 0 && (
-                                <p className="list-empty">No chats yet — start a conversation!</p>
-                            )}
-
-                            {dmRooms.length > 0 && (
-                                <>
-                                    <div className="list-section-label">Direct Messages</div>
-                                    {dmRooms.map((room) => {
-                                        const hasUnread = unreadCounts[room.id] > 0;
-                                        const otherOnline = room.otherUserId && onlineUsers[String(room.otherUserId)];
-                                        return (
-                                            <button key={room.id} className={`room-item ${room.id === activeRoomId ? "room-item--active" : ""}`} onClick={() => setActiveRoomId(room.id)}>
-                                                <div className="room-item-avatar-wrap">
-                                                    <div className="room-item-avatar room-item-avatar--dm">{getRoomInitial(room)}</div>
-                                                    {hasUnread
-                                                        ? <span className="unread-dot" />
-                                                        : <span className={`presence-dot ${otherOnline ? "presence-dot--on" : "presence-dot--off"}`} />
-                                                    }
-                                                </div>
-                                                <div className="room-item-info">
-                                                    <span className={`room-item-name ${hasUnread ? "room-item-name--unread" : ""}`}>{getRoomDisplayName(room)}</span>
-                                                    <span className="room-item-meta">Direct message</span>
-                                                </div>
-                                            </button>
-                                        );
-                                    })}
-                                </>
-                            )}
-
-                            {groupRooms.length > 0 && (
-                                <>
-                                    <div className="list-section-label">Groups</div>
-                                    {groupRooms.map((room) => {
-                                        const hasUnread = unreadCounts[room.id] > 0;
-                                        return (
-                                            <button key={room.id} className={`room-item ${room.id === activeRoomId ? "room-item--active" : ""}`} onClick={() => setActiveRoomId(room.id)}>
-                                                <div className="room-item-avatar-wrap">
-                                                    <div className="room-item-avatar">{getRoomInitial(room)}</div>
-                                                    {hasUnread && <span className="unread-dot" />}
-                                                </div>
-                                                <div className="room-item-info">
-                                                    <span className={`room-item-name ${hasUnread ? "room-item-name--unread" : ""}`}>{getRoomDisplayName(room)}</span>
-                                                    <span className="room-item-meta">{room["private"] ? "Private" : "Public"}</span>
-                                                </div>
-                                            </button>
-                                        );
-                                    })}
-                                </>
-                            )}
-                        </>
-                    )}
-
-                    {activeTab === "discover" && (
-                        <>
-                            {publicState.loading && <p className="list-empty">Searching...</p>}
-                            {publicState.error && <p className="list-empty list-empty--err">{publicState.error}</p>}
-                            {!publicState.loading && !publicState.error && publicRooms.length === 0 && <p className="list-empty">No public rooms found.</p>}
-                            {publicRooms.map((room) => (
-                                <button key={room.id} className="room-item" onClick={() => handleJoinPublicRoom(room.id, room.name)}>
-                                    <div className="room-item-avatar">{room.name.charAt(0).toUpperCase()}</div>
-                                    <div className="room-item-info">
-                                        <span className="room-item-name">{room.name}</span>
-                                        <span className="room-item-meta">Public room</span>
-                                    </div>
-                                    <span className="room-item-join">Join</span>
-                                </button>
-                            ))}
-                        </>
-                    )}
-                </div>
-            </div>
-
-            {/* ── Center: chat ── */}
-            <div className="chat-main">
-                {!activeRoomId ? (
-                    <div className="chat-empty-state">
-                        <div className="chat-empty-icon"><IconChat /></div>
-                        <p>Select a conversation to start chatting</p>
-                    </div>
-                ) : (
-                    <>
-                        <div className="chat-header">
-                            {activeRoom ? (
-                                <>
-                                    <div className={`chat-header-avatar ${isDm ? "chat-header-avatar--dm" : ""}`}>
-                                        {getRoomInitial(activeRoom)}
-                                    </div>
-                                    <div className="chat-header-info">
-                                        <span className="chat-header-name">{getRoomDisplayName(activeRoom)}</span>
-                                        <span className="chat-header-meta">
-                                            {isDm ? "Direct message" : (activeRoom["private"] ? "Private group" : "Public group")}
-                                        </span>
-                                    </div>
-                                    <div className={`ws-dot ${wsConnected ? "ws-dot--on" : "ws-dot--off"}`} title={wsConnected ? "Connected" : "Connecting..."} />
-                                </>
-                            ) : (
-                                <div className="chat-header-info"><span className="chat-header-name">Loading...</span></div>
-                            )}
-                        </div>
-
-                        <div className="chat-stream">
-                            {messageState.loading && <p className="stream-empty">Loading messages...</p>}
-                            {!messageState.loading && messageState.error && <p className="stream-empty stream-empty--err">{messageState.error}</p>}
-                            {!messageState.loading && !messageState.error && messages.length === 0 && <p className="stream-empty">No messages yet — say hello!</p>}
-                            {messages.map((msg) => (
-                                <div key={msg.id} className={`msg-row ${msg.isMe ? "msg-row--me" : "msg-row--them"}`}>
-                                    {!msg.isMe && <div className="msg-avatar">{msg.author.charAt(0).toUpperCase()}</div>}
-                                    <div className="msg-content">
-                                        {!msg.isMe && <div className="msg-author">{msg.author}</div>}
-                                        {editingMessageId === msg.id ? (
-                                            <div className="msg-edit-wrap">
-                                                <input
-                                                    className="msg-edit-input"
-                                                    value={editContent}
-                                                    onChange={(e) => setEditContent(e.target.value)}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === "Enter") handleEditMessage(msg.id, editContent);
-                                                        if (e.key === "Escape") { setEditingMessageId(null); setEditContent(""); }
-                                                    }}
-                                                    autoFocus
-                                                />
-                                                <span className="msg-edit-hint">Enter to save · Esc to cancel</span>
-                                            </div>
-                                        ) : (
-                                            <div className="msg-bubble-wrap">
-                                                {!msg.deleted && (
-                                                    <div className="msg-reaction-bar">
-                                                        {QUICK_EMOJIS.map((e) => (
-                                                            <button key={e} className="reaction-quick-btn" onClick={() => handleReaction(msg.id, e)}>{e}</button>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                                <div
-                                                    className={`msg-bubble ${msg.deleted ? "msg-bubble--deleted" : ""} ${!msg.deleted && msg.messageType !== "image" && isEmojiOnly(msg.content) ? "msg-bubble--emoji-only" : ""}`}
-                                                    onDoubleClick={() => {
-                                                        if (msg.isMe && !msg.deleted && msg.messageType !== "image") {
-                                                            setEditingMessageId(msg.id);
-                                                            setEditContent(msg.content);
-                                                        }
-                                                    }}
-                                                >
-                                                    {msg.replyToId && (
-                                                        <div className="reply-quote">
-                                                            <span className="reply-quote-author">{msg.replyToSenderUsername}</span>
-                                                            <span className="reply-quote-content">
-                                                                {msg.replyToContent ?? "Message deleted"}
-                                                            </span>
-                                                        </div>
-                                                    )}
-                                                    {msg.deleted ? (
-                                                        <p>This message was deleted</p>
-                                                    ) : msg.messageType === "image" ? (
-                                                        <img
-                                                            className="msg-image"
-                                                            src={`${API_BASE}${msg.content}`}
-                                                            alt="Shared image"
-                                                            onError={(e) => { e.target.style.display = "none"; }}
-                                                        />
-                                                    ) : (
-                                                        <p>{msg.content}</p>
-                                                    )}
-                                                    {msg.editedAt && !msg.deleted && <span className="msg-edited">(edited)</span>}
-                                                </div>
-                                            </div>
-                                        )}
-                                        {Object.keys(msg.reactions || {}).length > 0 && (
-                                            <div className="msg-reactions">
-                                                {Object.entries(msg.reactions).map(([emoji, count]) => (
-                                                    <button
-                                                        key={emoji}
-                                                        className={`reaction-pill ${(msg.myReactions || []).includes(emoji) ? "reaction-pill--mine" : ""}`}
-                                                        onClick={() => handleReaction(msg.id, emoji)}
-                                                    >
-                                                        {emoji} <span>{count}</span>
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        )}
-                                        <div className="msg-time-row">
-                                            <span className="msg-time">{msg.time}</span>
-                                            {!msg.deleted && editingMessageId !== msg.id && (
-                                                <button className="msg-reply-btn" onClick={() => { setReplyingTo({ id: msg.id, author: msg.author, content: msg.messageType === "image" ? "📷 Image" : msg.content, messageType: msg.messageType }); composerInputRef.current?.focus(); }} title="Reply">
-                                                    <IconReply />
-                                                </button>
-                                            )}
-                                            {msg.isMe && !msg.deleted && editingMessageId !== msg.id && (
-                                                <button className="msg-delete" onClick={() => handleDeleteMessage(msg.id)} title="Delete message">
-                                                    <IconTrash />
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                            {typerList.length > 0 && (
-                                <div className="typing-indicator">
-                                    <span className="typing-dots"><span /><span /><span /></span>
-                                    <span className="typing-text">
-                                        {typerList.join(", ")} {typerList.length === 1 ? "is" : "are"} typing...
-                                    </span>
-                                </div>
-                            )}
-                            <div ref={messagesEndRef} />
-                        </div>
-
-                        <div className="composer-wrap">
-                            {replyingTo && (
-                                <div className="reply-bar">
-                                    <div className="reply-bar-body">
-                                        <span className="reply-bar-author">Replying to {replyingTo.author}</span>
-                                        <span className="reply-bar-preview">{replyingTo.content}</span>
-                                    </div>
-                                    <button className="reply-bar-cancel" onClick={() => setReplyingTo(null)} title="Cancel reply">✕</button>
-                                </div>
-                            )}
-                            {showEmojiPicker && (
-                                <div className="emoji-picker-pop" ref={emojiPickerRef}>
-                                    <Picker
-                                        data={emojiData}
-                                        onEmojiSelect={handleEmojiSelect}
-                                        theme={document.documentElement.dataset.theme === "dark" ? "dark" : "light"}
-                                        set="twitter"
-                                        previewPosition="none"
-                                        skinTonePosition="none"
-                                        maxFrequentRows={2}
-                                    />
-                                </div>
-                            )}
-                            <form className="chat-composer" onSubmit={handleSend}>
-                                <input ref={fileInputRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleImageUpload} />
-                                <button
-                                    type="button"
-                                    className="composer-image-btn"
-                                    disabled={!activeRoomId || uploading}
-                                    onClick={() => fileInputRef.current?.click()}
-                                    title="Send image"
-                                >
-                                    <IconImage />
-                                </button>
-                                <input
-                                    ref={composerInputRef}
-                                    className="composer-input"
-                                    placeholder={uploading ? "Uploading..." : "Type a message..."}
-                                    value={draft}
-                                    onChange={handleDraftChange}
-                                    disabled={!activeRoomId || uploading}
-                                />
-                                <button
-                                    type="button"
-                                    className="composer-emoji-btn"
-                                    disabled={!activeRoomId || uploading}
-                                    onClick={() => setShowEmojiPicker((v) => !v)}
-                                    title="Insert emoji"
-                                >
-                                    😊
-                                </button>
-                                <button className="composer-send" type="submit" disabled={!activeRoomId || !draft.trim() || uploading}>Send</button>
-                            </form>
-                        </div>
-                    </>
-                )}
-            </div>
-
-            {/* ── Right: info panel ── */}
-            <div className="info-panel">
-                {activeRoom ? (
-                    <>
-                        <div className={`info-avatar ${isDm ? "info-avatar--dm" : ""}`}>
-                            {getRoomInitial(activeRoom)}
-                        </div>
-                        <h3 className="info-name">{getRoomDisplayName(activeRoom)}</h3>
-                        <span className="info-badge">{isDm ? "Direct Message" : (activeRoom["private"] ? "Private" : "Public")}</span>
-
-                        <div className="info-divider" />
-
-                        {isDm ? (
-                            <div className="info-section">
-                                <h4 className="info-section-title">Conversation</h4>
-                                <p className="info-detail">Private 1-on-1 chat</p>
-                                {activeRoom.createdAt && (
-                                    <p className="info-detail">Started {new Date(activeRoom.createdAt).toLocaleDateString()}</p>
-                                )}
-                            </div>
-                        ) : (
-                            <>
-                                <div className="info-section">
-                                    <h4 className="info-section-title">Members · {roomMembers.length}</h4>
-                                    {roomMembers.map((m) => (
-                                        <div key={m.userId} className="info-member">
-                                            <div className="info-member-avatar-wrap">
-                                                <div className="info-member-avatar">{m.username.charAt(0).toUpperCase()}</div>
-                                                <span className={`presence-dot ${onlineUsers[String(m.userId)] ? "presence-dot--on" : "presence-dot--off"}`} />
-                                            </div>
-                                            <span className="info-member-name">{m.username}{String(m.userId) === String(userId) ? " (you)" : ""}</span>
-                                            {m.role !== "member" && <span className="info-role-badge">{m.role}</span>}
-                                        </div>
-                                    ))}
-                                </div>
-
-                                <div className="info-divider" />
-
-                                <div className="info-section">
-                                    <h4 className="info-section-title">Details</h4>
-                                    <p className="info-detail">Room #{activeRoom.id}</p>
-                                    {activeRoom.createdAt && (
-                                        <p className="info-detail">Created {new Date(activeRoom.createdAt).toLocaleDateString()}</p>
-                                    )}
-                                </div>
-
-                                <div className="info-divider" />
-
-                                <div className="info-actions">
-                                    {isOwner ? (
-                                        <button className="info-action-btn info-action-btn--danger" onClick={handleDeleteRoom}>
-                                            Delete room
-                                        </button>
-                                    ) : (
-                                        <button className="info-action-btn" onClick={handleLeaveRoom}>
-                                            Leave room
-                                        </button>
-                                    )}
-                                </div>
-                            </>
-                        )}
-                    </>
-                ) : (
-                    <p className="info-empty">Select a chat to see details</p>
-                )}
-            </div>
+            <RoomInfo
+                activeRoom={activeRoom} isDm={isDm}
+                roomMembers={roomMembers} onlineUsers={onlineUsers}
+                userId={userId} isOwner={isOwner}
+                onLeave={handleLeaveRoom} onDelete={handleDeleteRoom}
+            />
 
             {toast.text && <div className={`toast toast--${toast.type}`}>{toast.text}</div>}
         </div>
