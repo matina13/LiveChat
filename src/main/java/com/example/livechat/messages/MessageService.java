@@ -7,8 +7,10 @@ import com.example.livechat.users.User;
 import com.example.livechat.users.UserRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -43,14 +45,14 @@ public class MessageService {
     @Transactional
     public MessageResponse sendMessage(long roomId, long userId, CreateMessageRequest request) {
         Room room = rooms.findById(roomId)
-                .orElseThrow(() -> new IllegalArgumentException("Room not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Room not found"));
 
         if (!members.existsByRoom_IdAndUser_Id(roomId, userId)) {
-            throw new IllegalArgumentException("Not a room member");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not a room member");
         }
 
         User sender = users.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
         Message message = new Message();
         message.setRoom(room);
@@ -59,9 +61,9 @@ public class MessageService {
 
         if (request.replyToId() != null) {
             Message replyTo = messages.findById(request.replyToId())
-                    .orElseThrow(() -> new IllegalArgumentException("Reply-to message not found"));
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reply-to message not found"));
             if (!replyTo.getRoom().getId().equals(roomId)) {
-                throw new IllegalArgumentException("Cannot reply to a message in another room");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot reply to a message in another room");
             }
             message.setReplyTo(replyTo);
         }
@@ -75,16 +77,16 @@ public class MessageService {
     @Transactional
     public MessageResponse editMessage(long roomId, long messageId, long userId, EditMessageRequest request) {
         Message message = messages.findById(messageId)
-                .orElseThrow(() -> new IllegalArgumentException("Message not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Message not found"));
 
         if (!message.getRoom().getId().equals(roomId)) {
-            throw new IllegalArgumentException("Message not in this room");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Message not in this room");
         }
         if (!message.getSender().getId().equals(userId)) {
-            throw new IllegalArgumentException("Cannot edit another user's message");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot edit another user's message");
         }
         if (message.getDeletedAt() != null) {
-            throw new IllegalArgumentException("Cannot edit a deleted message");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot edit a deleted message");
         }
 
         message.setContent(request.content().trim());
@@ -97,13 +99,13 @@ public class MessageService {
     @Transactional
     public void deleteMessage(long roomId, long messageId, long userId) {
         Message message = messages.findById(messageId)
-                .orElseThrow(() -> new IllegalArgumentException("Message not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Message not found"));
 
         if (!message.getRoom().getId().equals(roomId)) {
-            throw new IllegalArgumentException("Message not in this room");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Message not in this room");
         }
         if (!message.getSender().getId().equals(userId)) {
-            throw new IllegalArgumentException("Cannot delete another user's message");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot delete another user's message");
         }
         if (message.getDeletedAt() != null) {
             return; // already deleted — idempotent
@@ -117,10 +119,10 @@ public class MessageService {
     @Transactional(readOnly = true)
     public MessagesResponse listMessages(long roomId, long userId, int page, int size) {
         if (!rooms.existsById(roomId)) {
-            throw new IllegalArgumentException("Room not found");
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Room not found");
         }
         if (!members.existsByRoom_IdAndUser_Id(roomId, userId)) {
-            throw new IllegalArgumentException("Not a room member");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not a room member");
         }
 
         Page<Message> results = messages.findByRoom_IdOrderByCreatedAtDesc(roomId, PageRequest.of(page, size));
@@ -145,14 +147,14 @@ public class MessageService {
     @Transactional
     public MessageResponse createImageMessage(long roomId, long userId, String imageUrl) {
         Room room = rooms.findById(roomId)
-                .orElseThrow(() -> new IllegalArgumentException("Room not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Room not found"));
 
         if (!members.existsByRoom_IdAndUser_Id(roomId, userId)) {
-            throw new IllegalArgumentException("Not a room member");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not a room member");
         }
 
         User sender = users.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
         Message message = new Message();
         message.setRoom(room);
@@ -169,19 +171,19 @@ public class MessageService {
     @Transactional
     public Map<String, Object> toggleReaction(long roomId, long messageId, long userId, String emoji) {
         if (emoji == null || emoji.isBlank() || emoji.length() > 10) {
-            throw new IllegalArgumentException("Invalid emoji");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid emoji");
         }
 
         Message message = messages.findById(messageId)
-                .orElseThrow(() -> new IllegalArgumentException("Message not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Message not found"));
         if (!message.getRoom().getId().equals(roomId)) {
-            throw new IllegalArgumentException("Message not in this room");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Message not in this room");
         }
         if (!members.existsByRoom_IdAndUser_Id(roomId, userId)) {
-            throw new IllegalArgumentException("Not a room member");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not a room member");
         }
         if (message.getDeletedAt() != null) {
-            throw new IllegalArgumentException("Cannot react to a deleted message");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot react to a deleted message");
         }
 
         Optional<MessageReaction> existing = reactions.findByMessage_IdAndUser_IdAndEmoji(messageId, userId, emoji);
@@ -189,7 +191,7 @@ public class MessageService {
             reactions.delete(existing.get());
         } else {
             User user = users.findById(userId)
-                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
             MessageReaction reaction = new MessageReaction();
             reaction.setMessage(message);
             reaction.setUser(user);

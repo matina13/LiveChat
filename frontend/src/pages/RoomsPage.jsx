@@ -251,6 +251,12 @@ export default function RoomsPage() {
                         ));
                     } else {
                         setMessages((prev) => [...prev, mapMessage(payload, userId, username)]);
+                        const senderId = String(payload.senderId);
+                        if (typerTimersRef.current[senderId]) {
+                            clearTimeout(typerTimersRef.current[senderId]);
+                            delete typerTimersRef.current[senderId];
+                        }
+                        setTypers((prev) => { const next = { ...prev }; delete next[senderId]; return next; });
                     }
                 }
             );

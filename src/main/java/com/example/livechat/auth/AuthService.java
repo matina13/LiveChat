@@ -4,11 +4,13 @@ import com.example.livechat.security.JwtService;
 import com.example.livechat.users.User;
 import com.example.livechat.users.UserRepository;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class AuthService {
@@ -27,10 +29,10 @@ public class AuthService {
 
     public void register(RegisterRequest req) {
         if (users.existsByEmail(req.email())) {
-            throw new IllegalArgumentException("Email already in use");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already in use");
         }
         if (users.existsByUsername(req.username())) {
-            throw new IllegalArgumentException("Username already in use");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Username already in use");
         }
 
         User u = new User();
@@ -42,10 +44,10 @@ public class AuthService {
 
     public AuthResponse login(LoginRequest req) {
         User u = users.findByEmail(req.email())
-                .orElseThrow(() -> new IllegalArgumentException("Invalid credentials"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials"));
 
         if (!encoder.matches(req.password(), u.getPassword())) {
-            throw new IllegalArgumentException("Invalid credentials");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
         }
 
         long userId = u.getId().longValue();
@@ -59,14 +61,14 @@ public class AuthService {
         try {
             decoded = jwtDecoder.decode(refreshToken);
         } catch (JwtException e) {
-            throw new IllegalArgumentException("Invalid or expired refresh token");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or expired refresh token");
         }
         if (!"refresh".equals(decoded.getClaim("type"))) {
-            throw new IllegalArgumentException("Invalid token type");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token type");
         }
         long userId = Long.parseLong(decoded.getSubject());
         User user = users.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
         String newAccess = jwtService.createAccessToken(userId, user.getUsername());
         String newRefresh = jwtService.createRefreshToken(userId, user.getUsername());
         return new AuthResponse(newAccess, newRefresh, user.getUsername(), user.getEmail());

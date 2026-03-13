@@ -6,8 +6,10 @@ import com.example.livechat.users.UserRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
@@ -32,11 +34,11 @@ public class RoomService {
     public RoomResponse createRoom(CreateRoomRequest request, long userId) {
         String name = request.name().trim();
         if (rooms.existsByName(name)) {
-            throw new IllegalArgumentException("Room name already in use");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Room name already in use");
         }
 
         User creator = users.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
         Room room = new Room();
         room.setName(name);
@@ -57,13 +59,13 @@ public class RoomService {
     @Transactional
     public RoomResponse findOrCreateDm(long targetUserId, long userId) {
         if (targetUserId == userId) {
-            throw new IllegalArgumentException("Cannot start a DM with yourself");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot start a DM with yourself");
         }
 
         User target = users.findById(targetUserId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
         User self = users.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
         return rooms.findDmBetween(userId, targetUserId)
                 .map(r -> toResponse(r, userId))
@@ -108,25 +110,25 @@ public class RoomService {
     @Transactional(readOnly = true)
     public RoomResponse getRoom(long roomId, long userId) {
         Room room = rooms.findByIdForMember(roomId, userId)
-                .orElseThrow(() -> new IllegalArgumentException("Room not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Room not found"));
         return toResponse(room, userId);
     }
 
     @Transactional
     public RoomResponse joinRoom(long roomId, long userId) {
         Room room = rooms.findById(roomId)
-                .orElseThrow(() -> new IllegalArgumentException("Room not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Room not found"));
 
         if ("direct".equals(room.getType())) {
-            throw new IllegalArgumentException("Cannot join a direct message room");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot join a direct message room");
         }
 
         if (room.isPrivate()) {
-            throw new IllegalArgumentException("Room is private");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Room is private");
         }
 
         User user = users.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
         RoomMember member = new RoomMember();
         member.setRoom(room);
         member.setUser(user);
@@ -143,14 +145,14 @@ public class RoomService {
     @Transactional
     public void leaveRoom(long roomId, long userId) {
         Room room = rooms.findById(roomId)
-                .orElseThrow(() -> new IllegalArgumentException("Room not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Room not found"));
 
         if (!members.existsByRoom_IdAndUser_Id(roomId, userId)) {
-            throw new IllegalArgumentException("Not a member of this room");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not a member of this room");
         }
 
         if (room.getCreator().getId().equals(userId)) {
-            throw new IllegalArgumentException("Owner cannot leave — delete the room instead");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Owner cannot leave — delete the room instead");
         }
 
         members.deleteByRoom_IdAndUser_Id(roomId, userId);
@@ -159,10 +161,10 @@ public class RoomService {
     @Transactional
     public void deleteRoom(long roomId, long userId) {
         Room room = rooms.findById(roomId)
-                .orElseThrow(() -> new IllegalArgumentException("Room not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Room not found"));
 
         if (!room.getCreator().getId().equals(userId)) {
-            throw new IllegalArgumentException("Only the room owner can delete it");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the room owner can delete it");
         }
 
         rooms.delete(room);
@@ -171,7 +173,7 @@ public class RoomService {
     @Transactional(readOnly = true)
     public List<MemberResponse> getMembers(long roomId, long userId) {
         if (!members.existsByRoom_IdAndUser_Id(roomId, userId)) {
-            throw new IllegalArgumentException("Not a member of this room");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not a member of this room");
         }
 
         return members.findAllByRoomId(roomId).stream()
