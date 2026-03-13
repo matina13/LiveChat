@@ -19,5 +19,6 @@ public record MessageResponse(
         Set<String> myReactions,            // emojis the requesting user has reacted with
         Long replyToId,
         String replyToSenderUsername,
-        String replyToContent               // null if reply-to was deleted
+        String replyToContent,              // null if reply-to was deleted
+        String senderAvatarUrl
 ) {}

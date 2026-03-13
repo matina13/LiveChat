@@ -1,5 +1,7 @@
-import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { IconSettings } from "./icons";
+import Avatar from "./Avatar";
 import "./Sidebar.css";
 
 function IconChat() {
@@ -28,7 +30,7 @@ function IconSun() {
 
 function IconLogout() {
     return (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
             <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z" />
         </svg>
     );
@@ -36,14 +38,38 @@ function IconLogout() {
 
 export default function Sidebar() {
     const navigate = useNavigate();
+    const location = useLocation();
     const username = localStorage.getItem("authUsername") || "U";
-    const initial = username.charAt(0).toUpperCase();
+    const [avatarUrl, setAvatarUrl] = useState(() => localStorage.getItem("authAvatarUrl") || "");
+    const [showMenu, setShowMenu] = useState(false);
+    const menuRef = useRef(null);
 
     const [isDark, setIsDark] = useState(() => {
         const stored = localStorage.getItem("theme") === "dark";
         document.documentElement.dataset.theme = stored ? "dark" : "";
         return stored;
     });
+
+    // Listen for avatar updates from the settings page
+    useEffect(() => {
+        function onAvatarUpdated() {
+            setAvatarUrl(localStorage.getItem("authAvatarUrl") || "");
+        }
+        window.addEventListener("avatarUpdated", onAvatarUpdated);
+        return () => window.removeEventListener("avatarUpdated", onAvatarUpdated);
+    }, []);
+
+    // Close menu on outside click
+    useEffect(() => {
+        if (!showMenu) return;
+        function handleClick(e) {
+            if (menuRef.current && !menuRef.current.contains(e.target)) {
+                setShowMenu(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClick);
+        return () => document.removeEventListener("mousedown", handleClick);
+    }, [showMenu]);
 
     function toggleTheme() {
         const next = !isDark;
@@ -54,10 +80,14 @@ export default function Sidebar() {
 
     function logout() {
         localStorage.removeItem("authToken");
+        localStorage.removeItem("refreshToken");
         localStorage.removeItem("authUsername");
         localStorage.removeItem("authEmail");
+        localStorage.removeItem("authAvatarUrl");
         navigate("/login");
     }
+
+    const isSettings = location.pathname === "/settings";
 
     return (
         <aside className="icon-rail">
@@ -65,7 +95,11 @@ export default function Sidebar() {
                 LC
             </button>
 
-            <button className="rail-btn rail-btn--active" title="Chats">
+            <button
+                className={`rail-btn ${!isSettings ? "rail-btn--active" : ""}`}
+                title="Chats"
+                onClick={() => navigate("/home")}
+            >
                 <IconChat />
             </button>
 
@@ -80,15 +114,34 @@ export default function Sidebar() {
             </button>
 
             <button
-                className="rail-btn rail-btn--user"
-                title={`${username} — Log out`}
-                onClick={logout}
+                className={`rail-btn ${isSettings ? "rail-btn--active" : ""}`}
+                title="Settings"
+                onClick={() => navigate("/settings")}
             >
-                <span className="rail-avatar">{initial}</span>
-                <span className="rail-logout-hint">
-                    <IconLogout />
-                </span>
+                <IconSettings />
             </button>
+
+            <div className="rail-user-wrap" ref={menuRef}>
+                <button
+                    className="rail-btn rail-btn--user"
+                    title={username}
+                    onClick={() => setShowMenu((v) => !v)}
+                >
+                    <Avatar className="rail-avatar" username={username} avatarUrl={avatarUrl} />
+                </button>
+
+                {showMenu && (
+                    <div className="rail-user-menu">
+                        <div className="rail-menu-username">{username}</div>
+                        <button className="rail-menu-item" onClick={() => { navigate("/settings"); setShowMenu(false); }}>
+                            Settings
+                        </button>
+                        <button className="rail-menu-item rail-menu-item--danger" onClick={logout}>
+                            <IconLogout /> Sign out
+                        </button>
+                    </div>
+                )}
+            </div>
         </aside>
     );
 }

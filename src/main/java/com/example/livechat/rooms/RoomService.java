@@ -181,7 +181,8 @@ public class RoomService {
                         m.getUser().getId(),
                         m.getUser().getUsername(),
                         m.getRole(),
-                        m.getJoinedAt()
+                        m.getJoinedAt(),
+                        m.getUser().getAvatarUrl()
                 ))
                 .toList();
     }
@@ -208,11 +209,13 @@ public class RoomService {
     private RoomResponse toResponse(Room room, long userId, long unreadCount) {
         String otherUsername = null;
         Long otherUserId = null;
+        String otherUserAvatarUrl = null;
         if ("direct".equals(room.getType()) && userId > 0) {
             var other = members.findOtherMember(room.getId(), userId).orElse(null);
             if (other != null) {
                 otherUsername = other.getUser().getUsername();
                 otherUserId = other.getUser().getId();
+                otherUserAvatarUrl = other.getUser().getAvatarUrl();
             } else {
                 otherUsername = "Unknown";
             }
@@ -226,7 +229,8 @@ public class RoomService {
                 room.getType(),
                 otherUsername,
                 otherUserId,
-                unreadCount
+                unreadCount,
+                otherUserAvatarUrl
         );
     }
 }

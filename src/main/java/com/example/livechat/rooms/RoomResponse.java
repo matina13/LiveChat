@@ -11,5 +11,6 @@ public record RoomResponse(
         String type,
         String otherUsername,
         Long otherUserId,       // non-null for direct rooms
-        long unreadCount
+        long unreadCount,
+        String otherUserAvatarUrl
 ) {}

@@ -643,5 +643,6 @@ function mapMessage(message, userId, username) {
         replyToId: message.replyToId || null,
         replyToSenderUsername: message.replyToSenderUsername || null,
         replyToContent: message.replyToContent || null,
+        senderAvatarUrl: message.senderAvatarUrl || null,
     };
 }

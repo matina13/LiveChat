@@ -1,5 +1,6 @@
 import { IconPlus, IconCompose } from "./icons";
 import { getRoomDisplayName, getRoomInitial } from "../utils/chatUtils";
+import Avatar from "./Avatar";
 
 export default function ChatList({
     rooms, dmRooms, groupRooms,
@@ -41,7 +42,7 @@ export default function ChatList({
                     )}
                     {dmResults.map((u) => (
                         <button key={u.id} className="dm-search-result" onClick={() => handleStartDm(u.id)}>
-                            <div className="dm-search-avatar">{u.username.charAt(0).toUpperCase()}</div>
+                            <Avatar className="dm-search-avatar" username={u.username} avatarUrl={u.avatarUrl} />
                             <span>{u.username}</span>
                         </button>
                     ))}
@@ -106,7 +107,7 @@ export default function ChatList({
                                     return (
                                         <button key={room.id} className={`room-item ${room.id === activeRoomId ? "room-item--active" : ""}`} onClick={() => setActiveRoomId(room.id)}>
                                             <div className="room-item-avatar-wrap">
-                                                <div className="room-item-avatar room-item-avatar--dm">{getRoomInitial(room)}</div>
+                                                <Avatar className="room-item-avatar room-item-avatar--dm" username={getRoomDisplayName(room)} avatarUrl={room.otherUserAvatarUrl} />
                                                 {hasUnread
                                                     ? <span className="unread-dot" />
                                                     : <span className={`presence-dot ${otherOnline ? "presence-dot--on" : "presence-dot--off"}`} />

@@ -232,7 +232,8 @@ public class MessageService {
                 myReactions,
                 replyToId,
                 replyToSenderUsername,
-                replyToContent
+                replyToContent,
+                m.getSender().getAvatarUrl()
         );
     }
 }

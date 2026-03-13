@@ -34,6 +34,7 @@ export default function LoginPage() {
             localStorage.setItem("refreshToken", data.refreshToken);
             localStorage.setItem("authUsername", data.username);
             localStorage.setItem("authEmail", data.email);
+            localStorage.setItem("authAvatarUrl", data.avatarUrl || "");
             setStatus({ type: "ok", text: `Welcome back, ${data.username}!` });
             navigate("/home");
         } catch (error) {

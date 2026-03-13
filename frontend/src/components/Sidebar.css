@@ -88,24 +88,61 @@
     pointer-events: none;
 }
 
-.rail-logout-hint {
+
+.rail-user-wrap {
+    position: relative;
+}
+
+.rail-user-menu {
     position: absolute;
-    inset: 0;
+    bottom: 0;
+    left: calc(100% + 8px);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 140px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    z-index: 100;
+}
+
+.rail-menu-username {
+    padding: 8px 12px 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 160px;
+}
+
+.rail-menu-item {
+    background: none;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 6px;
+    text-align: left;
+    font-size: 13px;
+    color: var(--ink);
+    cursor: pointer;
+    white-space: nowrap;
     display: flex;
     align-items: center;
-    justify-content: center;
-    background: rgba(239, 68, 68, 0.9);
-    border-radius: 50%;
-    opacity: 0;
-    color: #fff;
-    transition: opacity 0.15s;
-    pointer-events: none;
+    gap: 8px;
 }
 
-.rail-btn--user:hover .rail-logout-hint {
-    opacity: 1;
+.rail-menu-item:hover {
+    background: var(--hover-bg);
 }
 
-.rail-btn--user:hover .rail-avatar {
-    opacity: 0;
+.rail-menu-item--danger {
+    color: #ef4444;
+}
+
+.rail-menu-item--danger:hover {
+    background: rgba(239, 68, 68, 0.08);
 }

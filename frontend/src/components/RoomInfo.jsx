@@ -1,13 +1,16 @@
 import { getRoomDisplayName, getRoomInitial } from "../utils/chatUtils";
+import Avatar from "./Avatar";
 
 export default function RoomInfo({ activeRoom, isDm, roomMembers, onlineUsers, userId, isOwner, onLeave, onDelete }) {
     return (
         <div className="info-panel">
             {activeRoom ? (
                 <>
-                    <div className={`info-avatar ${isDm ? "info-avatar--dm" : ""}`}>
-                        {getRoomInitial(activeRoom)}
-                    </div>
+                    <Avatar
+                        className={`info-avatar ${isDm ? "info-avatar--dm" : ""}`}
+                        username={getRoomDisplayName(activeRoom)}
+                        avatarUrl={isDm ? activeRoom.otherUserAvatarUrl : null}
+                    />
                     <h3 className="info-name">{getRoomDisplayName(activeRoom)}</h3>
                     <span className="info-badge">{isDm ? "Direct Message" : (activeRoom["private"] ? "Private" : "Public")}</span>
 
@@ -28,7 +31,7 @@ export default function RoomInfo({ activeRoom, isDm, roomMembers, onlineUsers, u
                                 {roomMembers.map((m) => (
                                     <div key={m.userId} className="info-member">
                                         <div className="info-member-avatar-wrap">
-                                            <div className="info-member-avatar">{m.username.charAt(0).toUpperCase()}</div>
+                                            <Avatar className="info-member-avatar" username={m.username} avatarUrl={m.avatarUrl} />
                                             <span className={`presence-dot ${onlineUsers[String(m.userId)] ? "presence-dot--on" : "presence-dot--off"}`} />
                                         </div>
                                         <span className="info-member-name">

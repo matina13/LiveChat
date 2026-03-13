@@ -53,7 +53,7 @@ public class AuthService {
         long userId = u.getId().longValue();
         String accessToken = jwtService.createAccessToken(userId, u.getUsername());
         String refreshToken = jwtService.createRefreshToken(userId, u.getUsername());
-        return new AuthResponse(accessToken, refreshToken, u.getUsername(), u.getEmail());
+        return new AuthResponse(accessToken, refreshToken, u.getUsername(), u.getEmail(), u.getAvatarUrl());
     }
 
     public AuthResponse refresh(String refreshToken) {
@@ -71,6 +71,6 @@ public class AuthService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
         String newAccess = jwtService.createAccessToken(userId, user.getUsername());
         String newRefresh = jwtService.createRefreshToken(userId, user.getUsername());
-        return new AuthResponse(newAccess, newRefresh, user.getUsername(), user.getEmail());
+        return new AuthResponse(newAccess, newRefresh, user.getUsername(), user.getEmail(), user.getAvatarUrl());
     }
 }

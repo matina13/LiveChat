@@ -18,6 +18,7 @@ function clearAuth() {
     localStorage.removeItem("refreshToken");
     localStorage.removeItem("authUsername");
     localStorage.removeItem("authEmail");
+    localStorage.removeItem("authAvatarUrl");
     window.location.href = "/login";
 }
 

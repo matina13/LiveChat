@@ -4,6 +4,7 @@ import emojiData from "@emoji-mart/data/sets/15/twitter.json";
 import { API_BASE } from "../api/client";
 import { IconChat, IconTrash, IconImage, IconReply } from "./icons";
 import { getRoomDisplayName, getRoomInitial } from "../utils/chatUtils";
+import Avatar from "./Avatar";
 
 const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
 const EMOJI_ONLY_RE = /^[\p{Emoji_Presentation}\p{Extended_Pictographic}\u200d\ufe0f\s]+$/u;
@@ -122,9 +123,11 @@ export default function ChatMain({
             <div className="chat-header">
                 {activeRoom ? (
                     <>
-                        <div className={`chat-header-avatar ${isDm ? "chat-header-avatar--dm" : ""}`}>
-                            {getRoomInitial(activeRoom)}
-                        </div>
+                        <Avatar
+                            className={`chat-header-avatar ${isDm ? "chat-header-avatar--dm" : ""}`}
+                            username={getRoomDisplayName(activeRoom)}
+                            avatarUrl={isDm ? activeRoom.otherUserAvatarUrl : null}
+                        />
                         <div className="chat-header-info">
                             <span className="chat-header-name">{getRoomDisplayName(activeRoom)}</span>
                             <span className="chat-header-meta">
@@ -161,7 +164,7 @@ export default function ChatMain({
                         id={`msg-${msg.id}`}
                         className={`msg-row ${msg.isMe ? "msg-row--me" : "msg-row--them"}${highlightedMsgId === msg.id ? " msg-row--highlight" : ""}`}
                     >
-                        {!msg.isMe && <div className="msg-avatar">{msg.author.charAt(0).toUpperCase()}</div>}
+                        {!msg.isMe && <Avatar className="msg-avatar" username={msg.author} avatarUrl={msg.senderAvatarUrl} />}
                         <div className="msg-content">
                             {!msg.isMe && <div className="msg-author">{msg.author}</div>}
 
