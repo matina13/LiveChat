@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import Sidebar from "../components/Sidebar";
-import { uploadAvatar } from "../api/usersApi";
+import { uploadAvatar, changePassword } from "../api/usersApi";
 import { API_BASE } from "../api/client";
 import "./SettingsPage.css";
 
@@ -9,6 +9,9 @@ export default function SettingsPage() {
     const email = localStorage.getItem("authEmail") || "";
     const [avatarUrl, setAvatarUrl] = useState(() => localStorage.getItem("authAvatarUrl") || "");
     const [uploading, setUploading] = useState(false);
+    const [showPwForm, setShowPwForm] = useState(false);
+    const [pwForm, setPwForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
+    const [pwSaving, setPwSaving] = useState(false);
     const [toast, setToast] = useState(null); // { type: "ok"|"err", text }
     const fileInputRef = useRef(null);
 
@@ -37,6 +40,33 @@ export default function SettingsPage() {
         } finally {
             setUploading(false);
             e.target.value = "";
+        }
+    }
+
+    async function handleChangePassword(e) {
+        e.preventDefault();
+        if (pwForm.newPassword !== pwForm.confirmPassword) {
+            showToast("err", "New passwords do not match.");
+            return;
+        }
+        if (pwForm.newPassword.length < 8) {
+            showToast("err", "New password must be at least 8 characters.");
+            return;
+        }
+        setPwSaving(true);
+        try {
+            await changePassword({
+                currentPassword: pwForm.currentPassword,
+                newPassword: pwForm.newPassword,
+            });
+            setPwForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+            setShowPwForm(false);
+            showToast("ok", "Password updated.");
+        } catch (err) {
+            const msg = err?.response?.data?.message || "Failed to update password.";
+            showToast("err", msg);
+        } finally {
+            setPwSaving(false);
         }
     }
 
@@ -88,6 +118,64 @@ export default function SettingsPage() {
                             </div>
                         </div>
                     </div>
+                </section>
+
+                <section className="settings-section">
+                    <h2 className="settings-section-title">Password</h2>
+                    {!showPwForm ? (
+                        <button className="settings-save-btn" onClick={() => setShowPwForm(true)}>
+                            Change password
+                        </button>
+                    ) : (
+                        <form className="settings-pw-form" onSubmit={handleChangePassword}>
+                            <div className="settings-field">
+                                <label className="settings-label">Current password</label>
+                                <input
+                                    className="settings-input"
+                                    type="password"
+                                    value={pwForm.currentPassword}
+                                    onChange={e => setPwForm(p => ({ ...p, currentPassword: e.target.value }))}
+                                    autoFocus
+                                    required
+                                />
+                            </div>
+                            <div className="settings-field">
+                                <label className="settings-label">New password</label>
+                                <input
+                                    className="settings-input"
+                                    type="password"
+                                    value={pwForm.newPassword}
+                                    onChange={e => setPwForm(p => ({ ...p, newPassword: e.target.value }))}
+                                    required
+                                />
+                            </div>
+                            <div className="settings-field">
+                                <label className="settings-label">Confirm new password</label>
+                                <input
+                                    className="settings-input"
+                                    type="password"
+                                    value={pwForm.confirmPassword}
+                                    onChange={e => setPwForm(p => ({ ...p, confirmPassword: e.target.value }))}
+                                    required
+                                />
+                            </div>
+                            <div className="settings-pw-actions">
+                                <button className="settings-save-btn" type="submit" disabled={pwSaving}>
+                                    {pwSaving ? "Saving…" : "Save password"}
+                                </button>
+                                <button
+                                    className="settings-cancel-btn"
+                                    type="button"
+                                    onClick={() => {
+                                        setShowPwForm(false);
+                                        setPwForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+                                    }}
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </form>
+                    )}
                 </section>
             </div>
 

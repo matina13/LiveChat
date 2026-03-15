@@ -142,6 +142,74 @@
     padding: 9px 12px;
 }
 
+/* ── Password form ───────────────────────────────────── */
+.settings-pw-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.settings-input {
+    font-size: 14px;
+    color: var(--ink);
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 12px;
+    outline: none;
+    transition: border-color 0.15s;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.settings-input:focus {
+    border-color: var(--accent);
+}
+
+.settings-save-btn {
+    align-self: flex-start;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 9px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+
+.settings-save-btn:hover:not(:disabled) {
+    opacity: 0.88;
+}
+
+.settings-save-btn:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.settings-pw-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.settings-cancel-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-2);
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.settings-cancel-btn:hover {
+    background: var(--panel-2);
+}
+
 /* ── Toast ───────────────────────────────────────────── */
 .settings-toast {
     position: fixed;

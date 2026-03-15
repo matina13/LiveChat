@@ -5,6 +5,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -23,9 +24,11 @@ import java.util.UUID;
 public class UserController {
 
     private final UserRepository users;
+    private final PasswordEncoder encoder;
 
-    public UserController(UserRepository users) {
+    public UserController(UserRepository users, PasswordEncoder encoder) {
         this.users = users;
+        this.encoder = encoder;
     }
 
     @GetMapping("/search")
@@ -72,5 +75,30 @@ public class UserController {
         users.save(user);
 
         return ResponseEntity.ok(Map.of("avatarUrl", "/uploads/" + filename));
+    }
+
+    @PatchMapping("/me/password")
+    public ResponseEntity<Void> changePassword(
+            @RequestBody Map<String, String> body,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        String currentPassword = body.get("currentPassword");
+        String newPassword = body.get("newPassword");
+
+        if (currentPassword == null || newPassword == null || newPassword.length() < 8) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "New password must be at least 8 characters");
+        }
+
+        long userId = Long.parseLong(jwt.getSubject());
+        User user = users.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        if (!encoder.matches(currentPassword, user.getPassword())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Current password is incorrect");
+        }
+
+        user.setPassword(encoder.encode(newPassword));
+        users.save(user);
+        return ResponseEntity.noContent().build();
     }
 }
