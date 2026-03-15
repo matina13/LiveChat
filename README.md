@@ -4,7 +4,7 @@ A real-time chat application built with Spring Boot and React.
 
 ## Preview
 
-![LiveChat screenshot](docs/Screenshot.png)
+![LiveChat screenshot](Screenshot.png)
 
 ## Features
 
