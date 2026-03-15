@@ -269,6 +269,51 @@
     color: #dc2626;
 }
 
+.list-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 40px 16px 20px;
+    gap: 8px;
+}
+
+.list-empty-state-icon {
+    font-size: 32px;
+    line-height: 1;
+    margin-bottom: 4px;
+}
+
+.list-empty-state-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.list-empty-state-hint {
+    margin: 0;
+    font-size: 13px;
+    color: var(--ink-2);
+    line-height: 1.5;
+}
+
+.list-empty-state-link {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.list-empty-state-link:hover {
+    opacity: 0.8;
+}
+
 /* ─── Chat main ─────────────────────────────────────────────── */
 .chat-main {
     flex: 1;
@@ -305,6 +350,20 @@
 .chat-empty-state p {
     margin: 0;
     font-size: 15px;
+}
+
+.chat-empty-title {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.chat-empty-sub {
+    font-size: 13px;
+    color: var(--ink-2);
+    max-width: 280px;
+    text-align: center;
+    line-height: 1.6;
 }
 
 /* ─── Chat header ───────────────────────────────────────────── */

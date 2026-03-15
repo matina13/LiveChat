@@ -2,6 +2,10 @@
 
 A real-time chat application built with Spring Boot and React.
 
+## Preview
+
+![LiveChat screenshot](docs/Screenshot.png)
+
 ## Features
 
 - **Messaging** — Send text messages and images, edit/delete your own, reply to messages, react with emojis

@@ -589,7 +589,7 @@ export default function RoomsPage() {
             />
 
             <ChatMain
-                activeRoom={activeRoom} activeRoomId={activeRoomId} isDm={isDm} wsConnected={wsConnected}
+                activeRoom={activeRoom} activeRoomId={activeRoomId} isDm={isDm} wsConnected={wsConnected} hasRooms={rooms.length > 0}
                 messages={messages} messageState={messageState}
                 typerList={typerList}
                 loadingMore={loadingMore} hasMoreMessages={hasMoreMessages}

@@ -95,7 +95,13 @@ export default function ChatList({
                         {roomsState.loading && <p className="list-empty">Loading...</p>}
                         {roomsState.error && <p className="list-empty list-empty--err">{roomsState.error}</p>}
                         {!roomsState.loading && !roomsState.error && rooms.length === 0 && (
-                            <p className="list-empty">No chats yet — start a conversation!</p>
+                            <div className="list-empty-state">
+                                <div className="list-empty-state-icon">💬</div>
+                                <p className="list-empty-state-title">No conversations yet</p>
+                                <p className="list-empty-state-hint">
+                                    Browse <button className="list-empty-state-link" onClick={() => setActiveTab("discover")}>public rooms</button> or start a <button className="list-empty-state-link" onClick={() => setShowDmSearch(true)}>direct message</button>.
+                                </p>
+                            </div>
                         )}
 
                         {dmRooms.length > 0 && (

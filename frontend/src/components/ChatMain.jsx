@@ -21,7 +21,7 @@ function calcPickerPos(clientX, clientY) {
 }
 
 export default function ChatMain({
-    activeRoom, activeRoomId, isDm, wsConnected,
+    activeRoom, activeRoomId, isDm, wsConnected, hasRooms,
     messages, messageState,
     typerList,
     loadingMore, hasMoreMessages,
@@ -111,7 +111,14 @@ export default function ChatMain({
             <div className="chat-main">
                 <div className="chat-empty-state">
                     <div className="chat-empty-icon"><IconChat /></div>
-                    <p>Select a conversation to start chatting</p>
+                    {hasRooms ? (
+                        <p>Select a conversation to start chatting</p>
+                    ) : (
+                        <>
+                            <p className="chat-empty-title">Welcome to LiveChat</p>
+                            <p className="chat-empty-sub">Join a public room from the Discover tab or start a direct message to begin.</p>
+                        </>
+                    )}
                 </div>
             </div>
         );
