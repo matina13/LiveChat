@@ -31,9 +31,10 @@ public class AuthController {
         return ResponseEntity.ok(authService.refresh(body.get("refreshToken")));
     }
 
-    @GetMapping("/ping")
-    public String ping() {
-        return "pong";
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@RequestBody Map<String, String> body) {
+        authService.logout(body.get("refreshToken"));
+        return ResponseEntity.noContent().build();
     }
 
 }

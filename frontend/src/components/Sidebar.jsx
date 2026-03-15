@@ -1,5 +1,6 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
+import { logout as apiLogout } from "../api/authApi";
 import { IconSettings } from "./icons";
 import Avatar from "./Avatar";
 import "./Sidebar.css";
@@ -78,7 +79,11 @@ export default function Sidebar() {
         localStorage.setItem("theme", next ? "dark" : "light");
     }
 
-    function logout() {
+    async function logout() {
+        const refreshToken = localStorage.getItem("refreshToken");
+        if (refreshToken) {
+            try { await apiLogout(refreshToken); } catch { /* ignore */ }
+        }
         localStorage.removeItem("authToken");
         localStorage.removeItem("refreshToken");
         localStorage.removeItem("authUsername");

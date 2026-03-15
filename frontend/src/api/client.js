@@ -13,7 +13,13 @@ api.interceptors.request.use((config) => {
 let isRefreshing = false;
 let refreshQueue = []; // { resolve, reject } waiting for the new token
 
-function clearAuth() {
+async function clearAuth() {
+    const refreshToken = localStorage.getItem("refreshToken");
+    if (refreshToken) {
+        try {
+            await axios.post(`${API_BASE}/api/auth/logout`, { refreshToken });
+        } catch { /* ignore — token may already be invalid */ }
+    }
     localStorage.removeItem("authToken");
     localStorage.removeItem("refreshToken");
     localStorage.removeItem("authUsername");
@@ -33,7 +39,7 @@ api.interceptors.response.use(
 
         const refreshToken = localStorage.getItem("refreshToken");
         if (!refreshToken) {
-            clearAuth();
+            await clearAuth();
             return Promise.reject(error);
         }
 
@@ -63,7 +69,7 @@ api.interceptors.response.use(
         } catch {
             refreshQueue.forEach(({ reject }) => reject());
             refreshQueue = [];
-            clearAuth();
+            await clearAuth();
             return Promise.reject(error);
         } finally {
             isRefreshing = false;

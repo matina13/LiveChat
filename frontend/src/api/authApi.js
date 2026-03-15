@@ -6,6 +6,9 @@ export function register(data) {
 export function login(data) {
     return api.post("/api/auth/login", data);
 }
+export function logout(refreshToken) {
+    return api.post("/api/auth/logout", { refreshToken });
+}
 
 export function fetchMe() {
     return api.get("/api/me");
