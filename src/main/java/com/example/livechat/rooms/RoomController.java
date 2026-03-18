@@ -94,6 +94,17 @@ public class RoomController {
         return ResponseEntity.ok(rooms.findOrCreateDm(targetUserId, userId));
     }
 
+    @PostMapping("/{id}/invite")
+    public ResponseEntity<Void> inviteToRoom(
+            @PathVariable long id,
+            @RequestBody java.util.Map<String, String> body,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        long userId = Long.parseLong(jwt.getSubject());
+        rooms.inviteToRoom(id, userId, body.get("username"));
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/presence")
     public ResponseEntity<List<Long>> getMyPresence(@AuthenticationPrincipal Jwt jwt) {
         long userId = Long.parseLong(jwt.getSubject());

@@ -12,6 +12,8 @@ import java.util.Optional;
 public interface RoomMemberRepository extends JpaRepository<RoomMember, Long> {
     boolean existsByRoom_IdAndUser_Id(long roomId, long userId);
 
+    Optional<RoomMember> findByRoom_IdAndUser_Id(long roomId, long userId);
+
     void deleteByRoom_IdAndUser_Id(long roomId, long userId);
 
     @Query("select rm from RoomMember rm join fetch rm.user where rm.room.id = :roomId order by rm.joinedAt asc")

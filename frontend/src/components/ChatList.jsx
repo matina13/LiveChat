@@ -142,7 +142,7 @@ export default function ChatList({
                                             </div>
                                             <div className="room-item-info">
                                                 <span className={`room-item-name ${hasUnread ? "room-item-name--unread" : ""}`}>{getRoomDisplayName(room)}</span>
-                                                <span className="room-item-meta">{room["private"] ? "Private" : "Public"}</span>
+                                                <span className="room-item-meta">{room.isPrivate ? "Private" : "Public"}</span>
                                             </div>
                                         </button>
                                     );

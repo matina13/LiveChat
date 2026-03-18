@@ -1,7 +1,36 @@
+import { useState } from "react";
 import { getRoomDisplayName, getRoomInitial } from "../utils/chatUtils";
+import { searchUsers } from "../api/usersApi";
 import Avatar from "./Avatar";
 
-export default function RoomInfo({ activeRoom, isDm, roomMembers, onlineUsers, userId, isOwner, onLeave, onDelete }) {
+export default function RoomInfo({ activeRoom, isDm, roomMembers, onlineUsers, userId, isOwner, onLeave, onDelete, onInvite }) {
+    const [showInvite, setShowInvite] = useState(false);
+    const [inviteQuery, setInviteQuery] = useState("");
+    const [inviteResults, setInviteResults] = useState([]);
+    const [inviteLoading, setInviteLoading] = useState(false);
+
+    async function handleInviteSearch(e) {
+        const q = e.target.value;
+        setInviteQuery(q);
+        if (!q.trim()) { setInviteResults([]); return; }
+        setInviteLoading(true);
+        try {
+            const { data } = await searchUsers(q.trim());
+            const memberIds = new Set(roomMembers.map(m => String(m.userId)));
+            setInviteResults(data.filter(u => !memberIds.has(String(u.id))));
+        } catch {
+            setInviteResults([]);
+        } finally {
+            setInviteLoading(false);
+        }
+    }
+
+    async function handlePickUser(username) {
+        await onInvite(username);
+        setShowInvite(false);
+        setInviteQuery("");
+        setInviteResults([]);
+    }
     return (
         <div className="info-panel">
             {activeRoom ? (
@@ -12,7 +41,7 @@ export default function RoomInfo({ activeRoom, isDm, roomMembers, onlineUsers, u
                         avatarUrl={isDm ? activeRoom.otherUserAvatarUrl : null}
                     />
                     <h3 className="info-name">{getRoomDisplayName(activeRoom)}</h3>
-                    <span className="info-badge">{isDm ? "Direct Message" : (activeRoom["private"] ? "Private" : "Public")}</span>
+                    <span className="info-badge">{isDm ? "Direct Message" : (activeRoom.isPrivate ? "Private" : "Public")}</span>
 
                     <div className="info-divider" />
 
@@ -27,7 +56,35 @@ export default function RoomInfo({ activeRoom, isDm, roomMembers, onlineUsers, u
                     ) : (
                         <>
                             <div className="info-section">
-                                <h4 className="info-section-title">Members · {roomMembers.length}</h4>
+                                <div className="info-section-header">
+                                    <h4 className="info-section-title">Members · {roomMembers.length}</h4>
+                                    {isOwner && (
+                                        <button className="info-invite-btn" onClick={() => { setShowInvite(v => !v); setInviteQuery(""); setInviteResults([]); }} title="Invite member">
+                                            + Invite
+                                        </button>
+                                    )}
+                                </div>
+                                {showInvite && (
+                                    <div className="info-invite-box">
+                                        <input
+                                            className="info-invite-input"
+                                            placeholder="Search username..."
+                                            value={inviteQuery}
+                                            onChange={handleInviteSearch}
+                                            autoFocus
+                                        />
+                                        {inviteLoading && <p className="info-invite-hint">Searching...</p>}
+                                        {!inviteLoading && inviteQuery && inviteResults.length === 0 && (
+                                            <p className="info-invite-hint">No users found.</p>
+                                        )}
+                                        {inviteResults.map(u => (
+                                            <button key={u.id} className="info-invite-result" onClick={() => handlePickUser(u.username)}>
+                                                <Avatar className="info-invite-avatar" username={u.username} avatarUrl={u.avatarUrl} />
+                                                <span>{u.username}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                                 {roomMembers.map((m) => (
                                     <div key={m.userId} className="info-member">
                                         <div className="info-member-avatar-wrap">

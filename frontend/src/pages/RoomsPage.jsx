@@ -3,7 +3,7 @@ import Sidebar from "../components/Sidebar";
 import ChatList from "../components/ChatList";
 import ChatMain from "../components/ChatMain";
 import RoomInfo from "../components/RoomInfo";
-import { createRoom, joinRoom, listRooms, searchPublicRooms, getRoom, leaveRoom, deleteRoom, getRoomMembers, startDm, getPresence } from "../api/roomsApi";
+import { createRoom, joinRoom, listRooms, searchPublicRooms, getRoom, leaveRoom, deleteRoom, getRoomMembers, startDm, getPresence, inviteToRoom } from "../api/roomsApi";
 import { listMessages, sendMessage, editMessage, deleteMessage, markRoomRead, uploadImage, toggleReaction } from "../api/messagesApi";
 import { searchUsers } from "../api/usersApi";
 import { createStompClient } from "../api/wsClient";
@@ -398,6 +398,17 @@ export default function RoomsPage() {
         }
     }
 
+    async function handleInvite(username) {
+        try {
+            await inviteToRoom(activeRoomId, { username });
+            const { data } = await getRoomMembers(activeRoomId);
+            setRoomMembers(data);
+            showToast("ok", `${username} was added to the room.`);
+        } catch (err) {
+            showToast("err", err?.response?.data?.message || "Failed to invite user.");
+        }
+    }
+
     async function handleDeleteRoom() {
         if (!activeRoomId) return;
         try {
@@ -610,6 +621,7 @@ export default function RoomsPage() {
                 roomMembers={roomMembers} onlineUsers={onlineUsers}
                 userId={userId} isOwner={isOwner}
                 onLeave={handleLeaveRoom} onDelete={handleDeleteRoom}
+                onInvite={handleInvite}
             />
 
             {toast.text && <div className={`toast toast--${toast.type}`}>{toast.text}</div>}

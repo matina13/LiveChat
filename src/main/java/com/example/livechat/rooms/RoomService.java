@@ -170,6 +170,32 @@ public class RoomService {
         rooms.delete(room);
     }
 
+    @Transactional
+    public void inviteToRoom(long roomId, long inviterId, String username) {
+        Room room = rooms.findById(roomId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Room not found"));
+
+        RoomMember inviter = members.findByRoom_IdAndUser_Id(roomId, inviterId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Not a member of this room"));
+
+        if (!"owner".equals(inviter.getRole()) && !"admin".equals(inviter.getRole())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only owners and admins can invite members");
+        }
+
+        User invitee = users.findByUsername(username)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        if (members.existsByRoom_IdAndUser_Id(roomId, invitee.getId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "User is already a member");
+        }
+
+        RoomMember member = new RoomMember();
+        member.setRoom(room);
+        member.setUser(invitee);
+        member.setRole("member");
+        members.save(member);
+    }
+
     @Transactional(readOnly = true)
     public List<MemberResponse> getMembers(long roomId, long userId) {
         if (!members.existsByRoom_IdAndUser_Id(roomId, userId)) {

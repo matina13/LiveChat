@@ -11,3 +11,4 @@ export function getRoomMembers(id)        { return api.get(`/api/rooms/${id}/mem
 export function startDm(targetUserId)     { return api.post(`/api/rooms/dm/${targetUserId}`); }
 export function getRoomPresence(id)       { return api.get(`/api/rooms/${id}/presence`); }
 export function getPresence()             { return api.get(`/api/rooms/presence`); }
+export function inviteToRoom(id, data)    { return api.post(`/api/rooms/${id}/invite`, data); }
