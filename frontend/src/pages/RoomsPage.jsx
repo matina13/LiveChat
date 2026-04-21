@@ -3,7 +3,7 @@ import Sidebar from "../components/Sidebar";
 import ChatList from "../components/ChatList";
 import ChatMain from "../components/ChatMain";
 import RoomInfo from "../components/RoomInfo";
-import { createRoom, joinRoom, listRooms, searchPublicRooms, getRoom, leaveRoom, deleteRoom, getRoomMembers, startDm, getPresence, inviteToRoom } from "../api/roomsApi";
+import { createRoom, joinRoom, listRooms, searchPublicRooms, getRoom, leaveRoom, deleteRoom, getRoomMembers, startDm, getPresence, inviteToRoom, changeMemberRole, kickMember } from "../api/roomsApi";
 import { listMessages, sendMessage, editMessage, deleteMessage, markRoomRead, uploadImage, toggleReaction } from "../api/messagesApi";
 import { searchUsers } from "../api/usersApi";
 import { createStompClient } from "../api/wsClient";
@@ -74,6 +74,7 @@ export default function RoomsPage() {
     const typingSubRef = useRef(null);
     const presenceSubsRef = useRef({});
     const notifSubRef = useRef(null);
+    const memberSubRef = useRef(null);
     const resubscribeRef = useRef(null);
     const activeRoomIdRef = useRef(null);
     const messagesEndRef = useRef(null);
@@ -231,6 +232,8 @@ export default function RoomsPage() {
             subscriptionRef.current = null;
             typingSubRef.current?.unsubscribe();
             typingSubRef.current = null;
+            memberSubRef.current?.unsubscribe();
+            memberSubRef.current = null;
             if (!roomId || !client.connected) return;
 
             subscriptionRef.current = client.subscribe(
@@ -264,6 +267,19 @@ export default function RoomsPage() {
                 `/topic/rooms/${roomId}/typing`,
                 (msg) => handleTypingEvent(JSON.parse(msg.body))
             );
+            memberSubRef.current = client.subscribe(
+                `/topic/rooms/${roomId}/members`,
+                (msg) => {
+                    const payload = JSON.parse(msg.body);
+                    if (payload.type === "role_changed") {
+                        setRoomMembers((prev) => prev.map((m) =>
+                            String(m.userId) === String(payload.userId) ? { ...m, role: payload.role } : m
+                        ));
+                    } else if (payload.type === "member_kicked") {
+                        setRoomMembers((prev) => prev.filter((m) => String(m.userId) !== String(payload.userId)));
+                    }
+                }
+            );
         }
 
         client.onConnect = () => {
@@ -275,6 +291,14 @@ export default function RoomsPage() {
                     const payload = JSON.parse(msg.body);
                     if (payload.type === "room_added") {
                         loadRooms();
+                        return;
+                    }
+                    if (payload.type === "room_removed") {
+                        setRooms((prev) => prev.filter((r) => r.id !== payload.roomId));
+                        if (String(payload.roomId) === String(activeRoomIdRef.current)) {
+                            setActiveRoomId(null);
+                            showToast("err", "You were removed from this room.");
+                        }
                         return;
                     }
                     const roomId = payload.roomId;
@@ -302,11 +326,13 @@ export default function RoomsPage() {
         return () => {
             subscriptionRef.current?.unsubscribe();
             typingSubRef.current?.unsubscribe();
+            memberSubRef.current?.unsubscribe();
             notifSubRef.current?.unsubscribe();
             Object.values(presenceSubsRef.current).forEach((s) => s.unsubscribe());
             presenceSubsRef.current = {};
             subscriptionRef.current = null;
             typingSubRef.current = null;
+            memberSubRef.current = null;
             notifSubRef.current = null;
             resubscribeRef.current = null;
             client.deactivate();
@@ -412,6 +438,28 @@ export default function RoomsPage() {
             showToast("ok", `${username} was added to the room.`);
         } catch (err) {
             showToast("err", err?.response?.data?.message || "Failed to invite user.");
+        }
+    }
+
+    async function handleChangeRole(memberId, newRole) {
+        try {
+            await changeMemberRole(activeRoomId, memberId, newRole);
+            setRoomMembers((prev) => prev.map((m) =>
+                String(m.userId) === String(memberId) ? { ...m, role: newRole } : m
+            ));
+            showToast("ok", `Role updated to ${newRole}.`);
+        } catch (err) {
+            showToast("err", err?.response?.data?.message || "Failed to change role.");
+        }
+    }
+
+    async function handleKickMember(memberId, memberUsername) {
+        try {
+            await kickMember(activeRoomId, memberId);
+            setRoomMembers((prev) => prev.filter((m) => String(m.userId) !== String(memberId)));
+            showToast("ok", `${memberUsername} was removed from the room.`);
+        } catch (err) {
+            showToast("err", err?.response?.data?.message || "Failed to remove member.");
         }
     }
 
@@ -578,6 +626,7 @@ export default function RoomsPage() {
     // ── Derived ───────────────────────────────────────────────
     const isOwner = activeRoom && String(activeRoom.creatorId) === String(userId);
     const isDm = activeRoom?.type === "direct";
+    const myRole = roomMembers.find((m) => String(m.userId) === String(userId))?.role || "member";
     const typerList = Object.values(typers);
     const dmRooms = rooms.filter((r) => r.type === "direct");
     const groupRooms = rooms.filter((r) => r.type !== "direct");
@@ -636,8 +685,10 @@ export default function RoomsPage() {
                 activeRoom={activeRoom} isDm={isDm}
                 roomMembers={roomMembers} onlineUsers={onlineUsers}
                 userId={userId} isOwner={isOwner}
+                myRole={myRole}
                 onLeave={handleLeaveRoom} onDelete={handleDeleteRoom}
                 onInvite={handleInvite}
+                onChangeRole={handleChangeRole} onKick={handleKickMember}
                 onMobileBack={() => setMobilePanel("chat")}
             />
 

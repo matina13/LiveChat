@@ -105,6 +105,29 @@ public class RoomController {
         return ResponseEntity.noContent().build();
     }
 
+    @PatchMapping("/{id}/members/{memberId}/role")
+    public ResponseEntity<Void> changeRole(
+            @PathVariable long id,
+            @PathVariable long memberId,
+            @RequestBody java.util.Map<String, String> body,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        long userId = Long.parseLong(jwt.getSubject());
+        rooms.changeRole(id, userId, memberId, body.get("role"));
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/{id}/members/{memberId}")
+    public ResponseEntity<Void> kickMember(
+            @PathVariable long id,
+            @PathVariable long memberId,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        long userId = Long.parseLong(jwt.getSubject());
+        rooms.kickMember(id, userId, memberId);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/presence")
     public ResponseEntity<List<Long>> getMyPresence(@AuthenticationPrincipal Jwt jwt) {
         long userId = Long.parseLong(jwt.getSubject());

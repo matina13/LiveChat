@@ -1,13 +1,28 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { getRoomDisplayName, getRoomInitial } from "../utils/chatUtils";
 import { searchUsers } from "../api/usersApi";
 import Avatar from "./Avatar";
 
-export default function RoomInfo({ activeRoom, isDm, roomMembers, onlineUsers, userId, isOwner, onLeave, onDelete, onInvite, onMobileBack }) {
+export default function RoomInfo({ activeRoom, isDm, roomMembers, onlineUsers, userId, isOwner, myRole, onLeave, onDelete, onInvite, onChangeRole, onKick, onMobileBack }) {
     const [showInvite, setShowInvite] = useState(false);
     const [inviteQuery, setInviteQuery] = useState("");
     const [inviteResults, setInviteResults] = useState([]);
     const [inviteLoading, setInviteLoading] = useState(false);
+    const [menuOpenFor, setMenuOpenFor] = useState(null);
+    const menuRef = useRef(null);
+
+    // Close menu on outside click
+    useEffect(() => {
+        if (menuOpenFor === null) return;
+        function handleClick(e) {
+            if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpenFor(null);
+        }
+        document.addEventListener("mousedown", handleClick);
+        return () => document.removeEventListener("mousedown", handleClick);
+    }, [menuOpenFor]);
+
+    // Close menu on room change
+    useEffect(() => { setMenuOpenFor(null); }, [activeRoom?.id]);
 
     async function handleInviteSearch(e) {
         const q = e.target.value;
@@ -61,7 +76,7 @@ export default function RoomInfo({ activeRoom, isDm, roomMembers, onlineUsers, u
                             <div className="info-section">
                                 <div className="info-section-header">
                                     <h4 className="info-section-title">Members · {roomMembers.length}</h4>
-                                    {isOwner && (
+                                    {(myRole === "owner" || myRole === "admin") && (
                                         <button className="info-invite-btn" onClick={() => { setShowInvite(v => !v); setInviteQuery(""); setInviteResults([]); }} title="Invite member">
                                             + Invite
                                         </button>
@@ -88,18 +103,55 @@ export default function RoomInfo({ activeRoom, isDm, roomMembers, onlineUsers, u
                                         ))}
                                     </div>
                                 )}
-                                {roomMembers.map((m) => (
-                                    <div key={m.userId} className="info-member">
-                                        <div className="info-member-avatar-wrap">
-                                            <Avatar className="info-member-avatar" username={m.username} avatarUrl={m.avatarUrl} />
-                                            <span className={`presence-dot ${onlineUsers[String(m.userId)] ? "presence-dot--on" : "presence-dot--off"}`} />
+                                {roomMembers.map((m) => {
+                                    const isMe = String(m.userId) === String(userId);
+                                    const canManage = !isMe && (
+                                        (myRole === "owner" && m.role !== "owner") ||
+                                        (myRole === "admin" && m.role === "member")
+                                    );
+                                    const menuOpen = menuOpenFor === m.userId;
+                                    return (
+                                        <div key={m.userId} className="info-member">
+                                            <div className="info-member-avatar-wrap">
+                                                <Avatar className="info-member-avatar" username={m.username} avatarUrl={m.avatarUrl} />
+                                                <span className={`presence-dot ${onlineUsers[String(m.userId)] ? "presence-dot--on" : "presence-dot--off"}`} />
+                                            </div>
+                                            <span className="info-member-name">
+                                                {m.username}{isMe ? " (you)" : ""}
+                                            </span>
+                                            {m.role !== "member" && <span className="info-role-badge">{m.role}</span>}
+                                            {canManage && (
+                                                <div className="info-member-menu-wrap" ref={menuOpen ? menuRef : undefined}>
+                                                    <button
+                                                        className="info-member-dots"
+                                                        onClick={() => setMenuOpenFor(menuOpen ? null : m.userId)}
+                                                        aria-label="Member options"
+                                                    >
+                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+                                                    </button>
+                                                    {menuOpen && (
+                                                        <div className="info-member-popover">
+                                                            {myRole === "owner" && (
+                                                                <button
+                                                                    className="info-member-popover-item"
+                                                                    onClick={() => { onChangeRole(m.userId, m.role === "admin" ? "member" : "admin"); setMenuOpenFor(null); }}
+                                                                >
+                                                                    {m.role === "admin" ? "Make member" : "Make admin"}
+                                                                </button>
+                                                            )}
+                                                            <button
+                                                                className="info-member-popover-item info-member-popover-item--danger"
+                                                                onClick={() => { onKick(m.userId, m.username); setMenuOpenFor(null); }}
+                                                            >
+                                                                Remove from room
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
-                                        <span className="info-member-name">
-                                            {m.username}{String(m.userId) === String(userId) ? " (you)" : ""}
-                                        </span>
-                                        {m.role !== "member" && <span className="info-role-badge">{m.role}</span>}
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
 
                             <div className="info-divider" />

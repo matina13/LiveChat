@@ -1297,6 +1297,79 @@
     text-transform: capitalize;
 }
 
+.info-member-menu-wrap {
+    position: relative;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.info-member-dots {
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--ink-2);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: background 0.15s, color 0.15s;
+    opacity: 0;
+}
+
+.info-member:hover .info-member-dots,
+.info-member-dots[aria-expanded="true"] {
+    opacity: 1;
+}
+
+.info-member-dots:hover {
+    background: var(--hover);
+    color: var(--ink);
+}
+
+.info-member-popover {
+    position: absolute;
+    right: 0;
+    top: 100%;
+    margin-top: 4px;
+    min-width: 170px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: var(--shadow-md);
+    z-index: 20;
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+}
+
+.info-member-popover-item {
+    border: none;
+    background: transparent;
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 500;
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s;
+}
+
+.info-member-popover-item:hover {
+    background: var(--hover);
+}
+
+.info-member-popover-item--danger {
+    color: #ef4444;
+}
+
+.info-member-popover-item--danger:hover {
+    background: rgba(239, 68, 68, 0.08);
+}
+
 .info-actions {
     width: 100%;
     margin-top: auto;

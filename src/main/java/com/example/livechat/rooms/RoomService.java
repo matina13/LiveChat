@@ -209,6 +209,73 @@ public class RoomService {
         );
     }
 
+    @Transactional
+    public void changeRole(long roomId, long actorId, long targetUserId, String newRole) {
+        if (!"admin".equals(newRole) && !"member".equals(newRole)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Role must be 'admin' or 'member'");
+        }
+        if (actorId == targetUserId) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot change your own role");
+        }
+
+        RoomMember actor = members.findByRoom_IdAndUser_Id(roomId, actorId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Not a member of this room"));
+        if (!"owner".equals(actor.getRole())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the owner can change roles");
+        }
+
+        RoomMember target = members.findByRoom_IdAndUser_Id(roomId, targetUserId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User is not a member of this room"));
+        if ("owner".equals(target.getRole())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot change the owner's role");
+        }
+
+        target.setRole(newRole);
+        members.save(target);
+
+        messagingTemplate.convertAndSend(
+                "/topic/rooms/" + roomId + "/members",
+                Map.of("type", "role_changed", "userId", targetUserId, "role", newRole)
+        );
+    }
+
+    @Transactional
+    public void kickMember(long roomId, long actorId, long targetUserId) {
+        if (actorId == targetUserId) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot kick yourself — use leave instead");
+        }
+
+        RoomMember actor = members.findByRoom_IdAndUser_Id(roomId, actorId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Not a member of this room"));
+
+        RoomMember target = members.findByRoom_IdAndUser_Id(roomId, targetUserId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User is not a member of this room"));
+
+        if ("owner".equals(target.getRole())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot kick the owner");
+        }
+        if ("owner".equals(actor.getRole())) {
+            // owner can kick anyone
+        } else if ("admin".equals(actor.getRole())) {
+            if (!"member".equals(target.getRole())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Admins can only kick members");
+            }
+        } else {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only owners and admins can kick members");
+        }
+
+        members.deleteByRoom_IdAndUser_Id(roomId, targetUserId);
+
+        messagingTemplate.convertAndSend(
+                "/topic/users/" + targetUserId + "/notifications",
+                Map.of("type", "room_removed", "roomId", roomId)
+        );
+        messagingTemplate.convertAndSend(
+                "/topic/rooms/" + roomId + "/members",
+                Map.of("type", "member_kicked", "userId", targetUserId)
+        );
+    }
+
     @Transactional(readOnly = true)
     public List<MemberResponse> getMembers(long roomId, long userId) {
         if (!members.existsByRoom_IdAndUser_Id(roomId, userId)) {
