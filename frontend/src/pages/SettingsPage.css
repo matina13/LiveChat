@@ -210,6 +210,34 @@
     background: var(--panel-2);
 }
 
+/* ── Responsive ─────────────────────────────────────── */
+@media (max-width: 640px) {
+    .settings-container {
+        padding: 24px 16px 60px;
+    }
+
+    .settings-avatar-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 20px;
+    }
+
+    .settings-avatar-wrap {
+        flex-direction: row;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .settings-avatar-hint {
+        text-align: left;
+    }
+
+    .settings-value {
+        font-size: 13px;
+        word-break: break-all;
+    }
+}
+
 /* ── Toast ───────────────────────────────────────────── */
 .settings-toast {
     position: fixed;

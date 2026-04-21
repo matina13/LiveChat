@@ -7,6 +7,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -22,12 +23,14 @@ public class RoomService {
     private final RoomMemberRepository members;
     private final UserRepository users;
     private final MessageRepository messages;
+    private final SimpMessagingTemplate messagingTemplate;
 
-    public RoomService(RoomRepository rooms, RoomMemberRepository members, UserRepository users, MessageRepository messages) {
+    public RoomService(RoomRepository rooms, RoomMemberRepository members, UserRepository users, MessageRepository messages, SimpMessagingTemplate messagingTemplate) {
         this.rooms = rooms;
         this.members = members;
         this.users = users;
         this.messages = messages;
+        this.messagingTemplate = messagingTemplate;
     }
 
     @Transactional
@@ -88,6 +91,11 @@ public class RoomService {
                     RoomMember m2 = new RoomMember();
                     m2.setRoom(saved); m2.setUser(target); m2.setRole("member");
                     members.save(m2);
+
+                    messagingTemplate.convertAndSend(
+                            "/topic/users/" + targetUserId + "/notifications",
+                            Map.of("type", "room_added", "roomId", saved.getId())
+                    );
 
                     return toResponse(saved, userId);
                 });
@@ -194,6 +202,11 @@ public class RoomService {
         member.setUser(invitee);
         member.setRole("member");
         members.save(member);
+
+        messagingTemplate.convertAndSend(
+                "/topic/users/" + invitee.getId() + "/notifications",
+                Map.of("type", "room_added", "roomId", roomId)
+        );
     }
 
     @Transactional(readOnly = true)

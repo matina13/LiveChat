@@ -273,6 +273,10 @@ export default function RoomsPage() {
                 `/topic/users/${userId}/notifications`,
                 (msg) => {
                     const payload = JSON.parse(msg.body);
+                    if (payload.type === "room_added") {
+                        loadRooms();
+                        return;
+                    }
                     const roomId = payload.roomId;
                     if (String(roomId) !== String(activeRoomIdRef.current)) {
                         setUnreadCounts((prev) => ({ ...prev, [roomId]: (prev[roomId] || 0) + 1 }));
@@ -364,10 +368,12 @@ export default function RoomsPage() {
         const name = roomName.trim();
         if (!name) { showToast("err", "Enter a room name first."); return; }
         try {
-            await createRoom({ name, isPrivate });
+            const { data: newRoom } = await createRoom({ name, isPrivate });
             setRoomName(""); setIsPrivate(false); setShowNewRoom(false);
             showToast("ok", `Room "${name}" created.`);
-            loadRooms();
+            await loadRooms();
+            setActiveRoomId(newRoom.id);
+            setActiveTab("chats");
         } catch (err) {
             showToast("err", err?.response?.data?.message || err?.response?.data?.error || "Failed to create room.");
         }
@@ -453,8 +459,8 @@ export default function RoomsPage() {
             setDmQuery("");
             setDmResults([]);
             setActiveTab("chats");
-            await loadRooms();
             setActiveRoomId(room.id);
+            loadRooms();
         } catch (err) {
             showToast("err", err?.response?.data?.message || "Failed to open conversation.");
         }
@@ -576,14 +582,22 @@ export default function RoomsPage() {
     const dmRooms = rooms.filter((r) => r.type === "direct");
     const groupRooms = rooms.filter((r) => r.type !== "direct");
 
+    // ── Mobile panel navigation ───────────────────────────────
+    const [mobilePanel, setMobilePanel] = useState("list");
+
+    const handleSelectRoom = useCallback((id) => {
+        setActiveRoomId(id);
+        setMobilePanel("chat");
+    }, []);
+
     // ── Render ────────────────────────────────────────────────
     return (
-        <div className="app-shell">
+        <div className="app-shell" data-mobile={mobilePanel}>
             <Sidebar />
 
             <ChatList
                 rooms={rooms} dmRooms={dmRooms} groupRooms={groupRooms}
-                activeRoomId={activeRoomId} setActiveRoomId={setActiveRoomId}
+                activeRoomId={activeRoomId} setActiveRoomId={handleSelectRoom}
                 unreadCounts={unreadCounts} onlineUsers={onlineUsers}
                 activeTab={activeTab} setActiveTab={setActiveTab}
                 publicQuery={publicQuery} setPublicQuery={setPublicQuery}
@@ -601,6 +615,8 @@ export default function RoomsPage() {
 
             <ChatMain
                 activeRoom={activeRoom} activeRoomId={activeRoomId} isDm={isDm} wsConnected={wsConnected} hasRooms={rooms.length > 0}
+                onMobileBack={() => setMobilePanel("list")}
+                onMobileInfo={() => setMobilePanel("info")}
                 messages={messages} messageState={messageState}
                 typerList={typerList}
                 loadingMore={loadingMore} hasMoreMessages={hasMoreMessages}
@@ -622,6 +638,7 @@ export default function RoomsPage() {
                 userId={userId} isOwner={isOwner}
                 onLeave={handleLeaveRoom} onDelete={handleDeleteRoom}
                 onInvite={handleInvite}
+                onMobileBack={() => setMobilePanel("chat")}
             />
 
             {toast.text && <div className={`toast toast--${toast.type}`}>{toast.text}</div>}

@@ -13,6 +13,23 @@ function isEmojiOnly(text) {
     return text.trim().length > 0 && EMOJI_ONLY_RE.test(text.trim());
 }
 
+const URL_RE = /https?:\/\/[^\s]+/g;
+
+function renderWithLinks(text) {
+    const parts = text.split(URL_RE);
+    const matches = [...text.matchAll(URL_RE)];
+    return parts.map((part, i) => (
+        <span key={i}>
+            {part}
+            {matches[i] && (
+                <a href={matches[i][0]} target="_blank" rel="noopener noreferrer">
+                    {matches[i][0]}
+                </a>
+            )}
+        </span>
+    ));
+}
+
 function calcPickerPos(clientX, clientY) {
     const W = 352, H = 450, PAD = 8;
     const left = Math.max(PAD, Math.min(clientX - W / 2, window.innerWidth - W - PAD));
@@ -35,6 +52,7 @@ export default function ChatMain({
     replyingTo, setReplyingTo,
     draft, setDraft, handleDraftChange, handleSend,
     uploading, fileInputRef, handleImageUpload,
+    onMobileBack, onMobileInfo,
 }) {
     // Internal state for overlays and UI
     const [highlightedMsgId, setHighlightedMsgId] = useState(null);
@@ -128,6 +146,9 @@ export default function ChatMain({
         <div className="chat-main">
             {/* Header */}
             <div className="chat-header">
+                <button className="mobile-back-btn" onClick={onMobileBack} aria-label="Back">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
                 {activeRoom ? (
                     <>
                         <Avatar
@@ -142,6 +163,9 @@ export default function ChatMain({
                             </span>
                         </div>
                         <div className={`ws-dot ${wsConnected ? "ws-dot--on" : "ws-dot--off"}`} title={wsConnected ? "Connected" : "Connecting..."} />
+                        <button className="mobile-info-btn" onClick={onMobileInfo} aria-label="Room info">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="8"/><line x1="12" y1="12" x2="12" y2="16"/></svg>
+                        </button>
                     </>
                 ) : (
                     <div className="chat-header-info"><span className="chat-header-name">Loading...</span></div>
@@ -230,7 +254,7 @@ export default function ChatMain({
                                                 onError={(e) => { e.target.style.display = "none"; }}
                                             />
                                         ) : (
-                                            <p>{msg.content}</p>
+                                            <p>{renderWithLinks(msg.content)}</p>
                                         )}
                                         {msg.editedAt && !msg.deleted && <span className="msg-edited">(edited)</span>}
                                     </div>

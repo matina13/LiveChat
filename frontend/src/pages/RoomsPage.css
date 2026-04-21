@@ -537,6 +537,14 @@
     border-radius: 18px 18px 4px 18px;
 }
 
+.msg-bubble a {
+    color: inherit;
+    text-decoration: underline;
+    opacity: 0.85;
+    word-break: break-all;
+}
+.msg-bubble a:hover { opacity: 1; }
+
 .msg-bubble p {
     margin: 0;
     font-size: 14px;
@@ -1329,10 +1337,55 @@
     }
 }
 
-@media (max-width: 780px) {
-    .list-panel {
+/* Mobile back / info buttons — hidden on desktop */
+.mobile-back-btn,
+.mobile-info-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    border: none;
+    background: transparent;
+    color: var(--ink-2);
+    border-radius: 8px;
+    cursor: pointer;
+    padding: 0;
+}
+.mobile-back-btn:hover,
+.mobile-info-btn:hover {
+    background: var(--hover);
+    color: var(--ink);
+}
+
+@media (max-width: 640px) {
+    /* Show only one panel at a time */
+    .list-panel,
+    .chat-main,
+    .info-panel {
         display: none;
     }
+
+    [data-mobile="list"] .list-panel  { display: flex; width: calc(100vw - 64px); }
+    [data-mobile="chat"] .chat-main   { display: flex; }
+    [data-mobile="info"] .info-panel  { display: flex; width: calc(100vw - 64px); }
+
+    /* Show nav buttons */
+    .mobile-back-btn,
+    .mobile-info-btn {
+        display: flex;
+    }
+
+    /* Info panel mobile adjustments */
+    .info-panel {
+        padding-top: 12px;
+    }
+
+    /* Full-width message bubbles on small screens */
+    .msg-row { max-width: 100%; }
+    .msg-bubble { max-width: 85vw; }
+    .msg-image  { max-width: 70vw; }
 }
 
 /* ─── Unread dot ─────────────────────────────────────────────── */

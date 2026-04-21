@@ -8,6 +8,8 @@ A real-time chat application built with Spring Boot and React.
 
 ## Features
 
+
+
 - **Messaging** — Send text messages and images, edit/delete your own, reply to messages, react with emojis
 - **Rooms** — Create public or private group rooms, join via discovery, leave or delete (owner)
 - **Direct Messages** — Start a DM with any user by searching their username

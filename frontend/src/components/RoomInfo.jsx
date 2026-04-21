@@ -3,7 +3,7 @@ import { getRoomDisplayName, getRoomInitial } from "../utils/chatUtils";
 import { searchUsers } from "../api/usersApi";
 import Avatar from "./Avatar";
 
-export default function RoomInfo({ activeRoom, isDm, roomMembers, onlineUsers, userId, isOwner, onLeave, onDelete, onInvite }) {
+export default function RoomInfo({ activeRoom, isDm, roomMembers, onlineUsers, userId, isOwner, onLeave, onDelete, onInvite, onMobileBack }) {
     const [showInvite, setShowInvite] = useState(false);
     const [inviteQuery, setInviteQuery] = useState("");
     const [inviteResults, setInviteResults] = useState([]);
@@ -33,6 +33,9 @@ export default function RoomInfo({ activeRoom, isDm, roomMembers, onlineUsers, u
     }
     return (
         <div className="info-panel">
+            <button className="mobile-back-btn mobile-back-btn--info" onClick={onMobileBack} aria-label="Back">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
             {activeRoom ? (
                 <>
                     <Avatar
